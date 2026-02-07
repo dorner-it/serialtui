@@ -4,7 +4,7 @@ use ratatui::crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
 };
 
-use crate::app::{App, Screen};
+use crate::app::{App, Dialog, Screen};
 use crate::message::Message;
 
 pub fn poll_event(app: &App) -> Option<Message> {
@@ -16,17 +16,17 @@ pub fn poll_event(app: &App) -> Option<Message> {
 
     match event {
         Event::Key(key) => {
-            // Ignore key release events (Windows sends both press and release)
             if key.kind != event::KeyEventKind::Press {
                 return None;
             }
 
-            // If a menu is open, Esc closes it; otherwise forward to screen handler
+            // Dialog takes priority over everything
+            if let Some(dialog) = &app.dialog {
+                return map_dialog(key, dialog);
+            }
+
             if app.open_menu.is_some() {
-                return match key.code {
-                    KeyCode::Esc => Some(Message::CloseMenu),
-                    _ => Some(Message::CloseMenu),
-                };
+                return Some(Message::CloseMenu);
             }
 
             match app.screen {
@@ -35,27 +35,50 @@ pub fn poll_event(app: &App) -> Option<Message> {
                 Screen::Connected => map_connected(key),
             }
         }
-        Event::Mouse(mouse) => match mouse.kind {
-            MouseEventKind::Down(MouseButton::Left) => {
-                Some(Message::MenuClick(mouse.column, mouse.row))
+        Event::Mouse(mouse) => {
+            if app.dialog.is_some() {
+                return None; // ignore mouse while dialog is open
             }
-            MouseEventKind::ScrollUp => {
-                if app.screen == Screen::Connected {
-                    Some(Message::ScrollUp)
-                } else {
-                    None
+            match mouse.kind {
+                MouseEventKind::Down(MouseButton::Left) => {
+                    Some(Message::MenuClick(mouse.column, mouse.row))
                 }
-            }
-            MouseEventKind::ScrollDown => {
-                if app.screen == Screen::Connected {
-                    Some(Message::ScrollDown)
-                } else {
-                    None
+                MouseEventKind::ScrollUp => {
+                    if app.screen == Screen::Connected {
+                        Some(Message::ScrollUp)
+                    } else {
+                        None
+                    }
                 }
+                MouseEventKind::ScrollDown => {
+                    if app.screen == Screen::Connected {
+                        Some(Message::ScrollDown)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
             }
+        }
+        _ => None,
+    }
+}
+
+fn map_dialog(key: KeyEvent, dialog: &Dialog) -> Option<Message> {
+    match dialog {
+        Dialog::ConfirmCloseConnection | Dialog::ConfirmQuit => match key.code {
+            KeyCode::Char('y') | KeyCode::Char('Y') => Some(Message::DialogYes),
+            KeyCode::Char('n') | KeyCode::Char('N') => Some(Message::DialogNo),
+            KeyCode::Esc => Some(Message::DialogCancel),
             _ => None,
         },
-        _ => None,
+        Dialog::FileNamePrompt { .. } => match key.code {
+            KeyCode::Enter => Some(Message::DialogConfirm),
+            KeyCode::Esc => Some(Message::DialogCancel),
+            KeyCode::Backspace => Some(Message::DialogBackspace),
+            KeyCode::Char(c) => Some(Message::DialogCharInput(c)),
+            _ => None,
+        },
     }
 }
 

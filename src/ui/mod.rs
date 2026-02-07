@@ -1,4 +1,5 @@
 mod baud_select;
+mod dialog;
 mod menu_bar;
 mod port_select;
 mod status_bar;
@@ -19,6 +20,11 @@ pub fn render(app: &App, frame: &mut Frame) {
         Screen::Connected => terminal_view::render(app, frame, content_area),
     }
 
-    // Menu bar renders last so dropdowns overlay content
+    // Menu bar renders after content so dropdowns overlay
     menu_bar::render(app, frame, menu_area);
+
+    // Dialog renders last, on top of everything
+    if let Some(ref dialog) = app.dialog {
+        dialog::render(dialog, frame);
+    }
 }

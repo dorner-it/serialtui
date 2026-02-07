@@ -34,4 +34,12 @@ pub enum Message {
     // Menu
     MenuClick(u16, u16),
     CloseMenu,
+
+    // Dialog responses
+    DialogYes,
+    DialogNo,
+    DialogCancel,
+    DialogConfirm,
+    DialogCharInput(char),
+    DialogBackspace,
 }

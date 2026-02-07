@@ -29,11 +29,12 @@ impl Connection {
             worker::connection_thread(id, &name, baud_rate, serial_tx, write_rx);
         });
 
+        let start_msg = format!("--- Connected to {} at {} baud ---", port_name, baud_rate);
         Self {
             id,
             port_name,
             baud_rate,
-            scrollback: Vec::new(),
+            scrollback: vec![start_msg],
             scroll_offset: 0,
             write_tx: Some(write_tx),
             alive: true,

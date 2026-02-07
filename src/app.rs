@@ -28,6 +28,24 @@ pub enum OpenMenu {
     View,
 }
 
+#[derive(Clone)]
+pub enum Dialog {
+    ConfirmCloseConnection,
+    ConfirmQuit,
+    FileNamePrompt {
+        connection_idx: usize,
+        filename: String,
+        after: AfterSave,
+    },
+}
+
+#[derive(Clone)]
+pub enum AfterSave {
+    Nothing,
+    CloseConnection,
+    QuitNext { remaining: Vec<usize> },
+}
+
 // Menu bar layout constants — must match menu_bar.rs rendering
 pub const MENU_FILE_X: u16 = 1;
 pub const MENU_FILE_W: u16 = 6; // " File "
@@ -75,6 +93,9 @@ pub struct App {
 
     // Menu
     pub open_menu: Option<OpenMenu>,
+
+    // Dialog
+    pub dialog: Option<Dialog>,
 }
 
 impl App {
@@ -97,6 +118,7 @@ impl App {
             adding_connection: false,
             status_message: None,
             open_menu: None,
+            dialog: None,
         };
         app.refresh_ports();
         app
@@ -154,7 +176,13 @@ impl App {
 
     pub fn update(&mut self, msg: Message) {
         match msg {
-            Message::Quit => self.should_quit = true,
+            Message::Quit => {
+                if self.connections.is_empty() {
+                    self.should_quit = true;
+                } else {
+                    self.dialog = Some(Dialog::ConfirmQuit);
+                }
+            }
 
             Message::Up => match self.screen {
                 Screen::PortSelect => {
@@ -230,16 +258,7 @@ impl App {
 
             Message::CloseConnection => {
                 if !self.connections.is_empty() {
-                    let idx = self.active_connection;
-                    self.connections[idx].close();
-                    self.connections.remove(idx);
-                    if self.connections.is_empty() {
-                        self.screen = Screen::PortSelect;
-                        self.adding_connection = false;
-                        self.refresh_ports();
-                    } else if self.active_connection >= self.connections.len() {
-                        self.active_connection = self.connections.len() - 1;
-                    }
+                    self.dialog = Some(Dialog::ConfirmCloseConnection);
                 }
             }
 
@@ -290,7 +309,12 @@ impl App {
 
             Message::ExportScrollback => {
                 if !self.connections.is_empty() {
-                    self.export_active_scrollback();
+                    let filename = self.generate_filename(self.active_connection);
+                    self.dialog = Some(Dialog::FileNamePrompt {
+                        connection_idx: self.active_connection,
+                        filename,
+                        after: AfterSave::Nothing,
+                    });
                 }
             }
 
@@ -298,9 +322,8 @@ impl App {
                 if !self.connections.is_empty() {
                     let conn = &mut self.connections[self.active_connection];
                     let total = conn.scrollback.len();
-                    if conn.scroll_offset < total {
-                        conn.scroll_offset = (conn.scroll_offset + 5).min(total);
-                    }
+                    let max_offset = total.saturating_sub(1);
+                    conn.scroll_offset = (conn.scroll_offset + 5).min(max_offset);
                 }
             }
 
@@ -317,6 +340,34 @@ impl App {
 
             Message::MenuClick(col, row) => {
                 self.handle_menu_click(col, row);
+            }
+
+            Message::DialogYes => {
+                self.handle_dialog_yes();
+            }
+
+            Message::DialogNo => {
+                self.handle_dialog_no();
+            }
+
+            Message::DialogCancel => {
+                self.dialog = None;
+            }
+
+            Message::DialogConfirm => {
+                self.handle_dialog_confirm();
+            }
+
+            Message::DialogCharInput(c) => {
+                if let Some(Dialog::FileNamePrompt { filename, .. }) = &mut self.dialog {
+                    filename.push(c);
+                }
+            }
+
+            Message::DialogBackspace => {
+                if let Some(Dialog::FileNamePrompt { filename, .. }) = &mut self.dialog {
+                    filename.pop();
+                }
             }
         }
     }
@@ -355,13 +406,25 @@ impl App {
             OpenMenu::File => {
                 let drop_col = col.wrapping_sub(MENU_FILE_X);
                 if row == 2 && drop_w.contains(&drop_col) {
+                    // Export
                     self.open_menu = None;
-                    if !self.connections.is_empty() && self.screen == Screen::Connected {
-                        self.export_active_scrollback();
+                    if !self.connections.is_empty() {
+                        let filename = self.generate_filename(self.active_connection);
+                        self.dialog = Some(Dialog::FileNamePrompt {
+                            connection_idx: self.active_connection,
+                            filename,
+                            after: AfterSave::Nothing,
+                        });
                     }
                     true
                 } else if row == 3 && drop_w.contains(&drop_col) {
-                    self.should_quit = true;
+                    // Quit
+                    self.open_menu = None;
+                    if self.connections.is_empty() {
+                        self.should_quit = true;
+                    } else {
+                        self.dialog = Some(Dialog::ConfirmQuit);
+                    }
                     true
                 } else {
                     false
@@ -378,18 +441,10 @@ impl App {
                     }
                     true
                 } else if row == 3 && drop_w.contains(&drop_col) {
+                    // Close
                     self.open_menu = None;
                     if !self.connections.is_empty() {
-                        let idx = self.active_connection;
-                        self.connections[idx].close();
-                        self.connections.remove(idx);
-                        if self.connections.is_empty() {
-                            self.screen = Screen::PortSelect;
-                            self.adding_connection = false;
-                            self.refresh_ports();
-                        } else if self.active_connection >= self.connections.len() {
-                            self.active_connection = self.connections.len() - 1;
-                        }
+                        self.dialog = Some(Dialog::ConfirmCloseConnection);
                     }
                     true
                 } else {
@@ -416,6 +471,87 @@ impl App {
         }
     }
 
+    fn handle_dialog_yes(&mut self) {
+        match self.dialog.take() {
+            Some(Dialog::ConfirmCloseConnection) => {
+                let idx = self.active_connection;
+                let filename = self.generate_filename(idx);
+                self.dialog = Some(Dialog::FileNamePrompt {
+                    connection_idx: idx,
+                    filename,
+                    after: AfterSave::CloseConnection,
+                });
+            }
+            Some(Dialog::ConfirmQuit) => {
+                let indices: Vec<usize> = (0..self.connections.len()).collect();
+                self.start_save_chain(indices);
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_dialog_no(&mut self) {
+        match self.dialog.take() {
+            Some(Dialog::ConfirmCloseConnection) => {
+                self.do_close_active_connection();
+            }
+            Some(Dialog::ConfirmQuit) => {
+                self.should_quit = true;
+            }
+            _ => {}
+        }
+    }
+
+    fn handle_dialog_confirm(&mut self) {
+        if let Some(Dialog::FileNamePrompt {
+            connection_idx,
+            filename,
+            after,
+        }) = self.dialog.take()
+        {
+            self.export_connection(connection_idx, &filename);
+            match after {
+                AfterSave::Nothing => {}
+                AfterSave::CloseConnection => {
+                    self.do_close_active_connection();
+                }
+                AfterSave::QuitNext { remaining } => {
+                    self.start_save_chain(remaining);
+                }
+            }
+        }
+    }
+
+    fn start_save_chain(&mut self, mut indices: Vec<usize>) {
+        if let Some(idx) = indices.first().copied() {
+            indices.remove(0);
+            let filename = self.generate_filename(idx);
+            self.dialog = Some(Dialog::FileNamePrompt {
+                connection_idx: idx,
+                filename,
+                after: AfterSave::QuitNext { remaining: indices },
+            });
+        } else {
+            self.should_quit = true;
+        }
+    }
+
+    fn do_close_active_connection(&mut self) {
+        if self.connections.is_empty() {
+            return;
+        }
+        let idx = self.active_connection;
+        self.connections[idx].close();
+        self.connections.remove(idx);
+        if self.connections.is_empty() {
+            self.screen = Screen::PortSelect;
+            self.adding_connection = false;
+            self.refresh_ports();
+        } else if self.active_connection >= self.connections.len() {
+            self.active_connection = self.connections.len() - 1;
+        }
+    }
+
     fn connect_selected(&mut self) {
         if self.available_ports.is_empty() {
             return;
@@ -432,21 +568,24 @@ impl App {
         self.screen = Screen::Connected;
     }
 
-    fn export_active_scrollback(&mut self) {
-        let conn = &self.connections[self.active_connection];
+    fn generate_filename(&self, connection_idx: usize) -> String {
+        let conn = &self.connections[connection_idx];
         let safe_name = conn.port_name.replace(['/', '\\', ':'], "_");
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let filename = format!("{}_{}_{}.txt", safe_name, conn.baud_rate, timestamp);
+        let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S");
+        format!("{}_{}_{}.txt", safe_name, conn.baud_rate, timestamp)
+    }
 
+    fn export_connection(&mut self, connection_idx: usize, filename: &str) {
+        if connection_idx >= self.connections.len() {
+            return;
+        }
+        let conn = &self.connections[connection_idx];
         let content: String = conn
             .scrollback_with_partial()
             .collect::<Vec<_>>()
             .join("\n");
 
-        match std::fs::write(&filename, &content) {
+        match std::fs::write(filename, &content) {
             Ok(()) => {
                 self.status_message = Some((format!("Exported to {}", filename), Instant::now()));
             }

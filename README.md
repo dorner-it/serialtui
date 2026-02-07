@@ -10,8 +10,10 @@ A terminal-based serial port monitor with support for multiple simultaneous conn
 - **Multiple connections** — open several ports at once, switch between them
 - **Tab and grid views** — view one connection at a time or all at once in a split layout
 - **Unlimited scrollback** per connection with arrow keys, PageUp/PageDown, and mouse wheel scrolling
-- **Export to file** — save any connection's scrollback as a `.txt` file with `Ctrl+E`
-- **Clickable menu bar** — File, Connection, and View menus with mouse support
+- **Export to file** — save scrollback as `.txt` with editable filename prompt (`Ctrl+E` or File menu)
+- **Save on close/quit** — prompted to export sessions when closing a connection or quitting
+- **Clickable menu bar** — File (Export, Quit), Connection (New, Close), View (Tab, Grid) with mouse support
+- **Connection banner** — each session starts with a `--- Connected to <port> at <baud> baud ---` line
 - **Cross-platform** — runs on Windows, macOS, and Linux (Windows `.exe` provided in releases)
 
 ## Installation
@@ -40,6 +42,18 @@ serialtui
 
 Open additional connections with `Ctrl+N`, which returns you to port selection.
 
+### Exporting
+
+When exporting (via `Ctrl+E`, the File menu, or when closing/quitting), a filename prompt appears pre-filled with a generated name in the format:
+
+```
+<port>_<baud>_YYYYMMDD_HHMMSS.txt
+```
+
+Press Enter to accept, edit the name, or Esc to cancel.
+
+When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked whether to save the session first. Choosing "Yes" walks through a filename prompt for each connection.
+
 ### Key Bindings
 
 #### Port Selection
@@ -64,14 +78,14 @@ Open additional connections with `Ctrl+N`, which returns you to port selection.
 | Tab / Shift+Tab | Next / previous connection |
 | 1–9 | Jump to connection N |
 | Ctrl+N | New connection |
-| Ctrl+W | Close active connection |
+| Ctrl+W | Close active connection (prompts to save) |
 | Ctrl+E | Export scrollback to .txt |
 | Ctrl+G | Toggle tab / grid view |
 | Up / Down | Scroll line by line |
 | PageUp / PageDown | Scroll |
 | Mouse wheel | Scroll |
 | Enter | Send input |
-| Ctrl+Q | Quit |
+| Ctrl+Q | Quit (prompts to save all) |
 
 ## Building
 
