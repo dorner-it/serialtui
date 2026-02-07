@@ -354,13 +354,13 @@ impl App {
         let handled = match menu {
             OpenMenu::File => {
                 let drop_col = col.wrapping_sub(MENU_FILE_X);
-                if row == 1 && drop_w.contains(&drop_col) {
+                if row == 2 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
                     if !self.connections.is_empty() && self.screen == Screen::Connected {
                         self.export_active_scrollback();
                     }
                     true
-                } else if row == 2 && drop_w.contains(&drop_col) {
+                } else if row == 3 && drop_w.contains(&drop_col) {
                     self.should_quit = true;
                     true
                 } else {
@@ -369,7 +369,7 @@ impl App {
             }
             OpenMenu::Connection => {
                 let drop_col = col.wrapping_sub(MENU_CONN_X);
-                if row == 1 && drop_w.contains(&drop_col) {
+                if row == 2 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
                     if self.screen == Screen::Connected {
                         self.adding_connection = true;
@@ -377,7 +377,7 @@ impl App {
                         self.screen = Screen::PortSelect;
                     }
                     true
-                } else if row == 2 && drop_w.contains(&drop_col) {
+                } else if row == 3 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
                     if !self.connections.is_empty() {
                         let idx = self.active_connection;
@@ -398,11 +398,11 @@ impl App {
             }
             OpenMenu::View => {
                 let drop_col = col.wrapping_sub(MENU_VIEW_X);
-                if row == 1 && drop_w.contains(&drop_col) {
+                if row == 2 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
                     self.view_mode = ViewMode::Tabs;
                     true
-                } else if row == 2 && drop_w.contains(&drop_col) {
+                } else if row == 3 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
                     self.view_mode = ViewMode::Grid;
                     true
