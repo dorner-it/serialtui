@@ -7,7 +7,7 @@ use ratatui::Frame;
 use crate::app::{App, ViewMode};
 use crate::serial::Connection;
 
-pub fn render(app: &App, frame: &mut Frame) {
+pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     if app.connections.is_empty() {
         return;
     }
@@ -17,7 +17,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         Constraint::Length(3),
         Constraint::Length(1),
     ])
-    .areas(frame.area());
+    .areas(area);
 
     match app.view_mode {
         ViewMode::Tabs => render_tabs(app, frame, main_area),

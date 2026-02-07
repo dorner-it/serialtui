@@ -30,4 +30,8 @@ pub enum Message {
     // Scroll
     ScrollUp,
     ScrollDown,
+
+    // Menu
+    MenuClick(u16, u16),
+    CloseMenu,
 }

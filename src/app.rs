@@ -21,6 +21,21 @@ pub enum ViewMode {
     Grid,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum OpenMenu {
+    File,
+    Connection,
+    View,
+}
+
+// Menu bar layout constants — must match menu_bar.rs rendering
+pub const MENU_FILE_X: u16 = 1;
+pub const MENU_FILE_W: u16 = 6; // " File "
+pub const MENU_CONN_X: u16 = 7;
+pub const MENU_CONN_W: u16 = 12; // " Connection "
+pub const MENU_VIEW_X: u16 = 19;
+pub const MENU_VIEW_W: u16 = 6; // " View "
+
 pub struct PortInfo {
     pub name: String,
     pub description: String,
@@ -57,6 +72,9 @@ pub struct App {
 
     // Status message (shown briefly in status bar)
     pub status_message: Option<(String, Instant)>,
+
+    // Menu
+    pub open_menu: Option<OpenMenu>,
 }
 
 impl App {
@@ -78,6 +96,7 @@ impl App {
             next_connection_id: 0,
             adding_connection: false,
             status_message: None,
+            open_menu: None,
         };
         app.refresh_ports();
         app
@@ -291,6 +310,109 @@ impl App {
                     conn.scroll_offset = conn.scroll_offset.saturating_sub(5);
                 }
             }
+
+            Message::CloseMenu => {
+                self.open_menu = None;
+            }
+
+            Message::MenuClick(col, row) => {
+                self.handle_menu_click(col, row);
+            }
+        }
+    }
+
+    fn handle_menu_click(&mut self, col: u16, row: u16) {
+        let file_range = MENU_FILE_X..MENU_FILE_X + MENU_FILE_W;
+        let conn_range = MENU_CONN_X..MENU_CONN_X + MENU_CONN_W;
+        let view_range = MENU_VIEW_X..MENU_VIEW_X + MENU_VIEW_W;
+
+        if row == 0 {
+            // Clicking on the menu bar itself — toggle menus
+            let new_menu = if file_range.contains(&col) {
+                Some(OpenMenu::File)
+            } else if conn_range.contains(&col) {
+                Some(OpenMenu::Connection)
+            } else if view_range.contains(&col) {
+                Some(OpenMenu::View)
+            } else {
+                None
+            };
+            if new_menu == self.open_menu {
+                self.open_menu = None;
+            } else {
+                self.open_menu = new_menu;
+            }
+            return;
+        }
+
+        // Clicking on an open dropdown
+        let Some(menu) = self.open_menu else {
+            return;
+        };
+
+        let drop_w = 0..16_u16; // dropdown is 16 chars wide
+        let handled = match menu {
+            OpenMenu::File => {
+                let drop_col = col.wrapping_sub(MENU_FILE_X);
+                if row == 1 && drop_w.contains(&drop_col) {
+                    self.open_menu = None;
+                    if !self.connections.is_empty() && self.screen == Screen::Connected {
+                        self.export_active_scrollback();
+                    }
+                    true
+                } else if row == 2 && drop_w.contains(&drop_col) {
+                    self.should_quit = true;
+                    true
+                } else {
+                    false
+                }
+            }
+            OpenMenu::Connection => {
+                let drop_col = col.wrapping_sub(MENU_CONN_X);
+                if row == 1 && drop_w.contains(&drop_col) {
+                    self.open_menu = None;
+                    if self.screen == Screen::Connected {
+                        self.adding_connection = true;
+                        self.refresh_ports();
+                        self.screen = Screen::PortSelect;
+                    }
+                    true
+                } else if row == 2 && drop_w.contains(&drop_col) {
+                    self.open_menu = None;
+                    if !self.connections.is_empty() {
+                        let idx = self.active_connection;
+                        self.connections[idx].close();
+                        self.connections.remove(idx);
+                        if self.connections.is_empty() {
+                            self.screen = Screen::PortSelect;
+                            self.adding_connection = false;
+                            self.refresh_ports();
+                        } else if self.active_connection >= self.connections.len() {
+                            self.active_connection = self.connections.len() - 1;
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            OpenMenu::View => {
+                let drop_col = col.wrapping_sub(MENU_VIEW_X);
+                if row == 1 && drop_w.contains(&drop_col) {
+                    self.open_menu = None;
+                    self.view_mode = ViewMode::Tabs;
+                    true
+                } else if row == 2 && drop_w.contains(&drop_col) {
+                    self.open_menu = None;
+                    self.view_mode = ViewMode::Grid;
+                    true
+                } else {
+                    false
+                }
+            }
+        };
+        if !handled {
+            self.open_menu = None;
         }
     }
 

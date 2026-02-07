@@ -43,7 +43,7 @@ fn run(
         terminal.draw(|frame| ui::render(&app, frame))?;
 
         // Poll crossterm input events
-        if let Some(msg) = input::poll_event(&app.screen) {
+        if let Some(msg) = input::poll_event(&app) {
             app.update(msg);
         }
 

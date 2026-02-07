@@ -1,29 +1,61 @@
 use std::time::Duration;
 
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{
+    self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
+};
 
-use crate::app::Screen;
+use crate::app::{App, Screen};
 use crate::message::Message;
 
-pub fn poll_event(screen: &Screen) -> Option<Message> {
+pub fn poll_event(app: &App) -> Option<Message> {
     if !event::poll(Duration::from_millis(50)).ok()? {
         return None;
     }
 
     let event = event::read().ok()?;
-    let Event::Key(key) = event else {
-        return None;
-    };
 
-    // Ignore key release events (Windows sends both press and release)
-    if key.kind != event::KeyEventKind::Press {
-        return None;
-    }
+    match event {
+        Event::Key(key) => {
+            // Ignore key release events (Windows sends both press and release)
+            if key.kind != event::KeyEventKind::Press {
+                return None;
+            }
 
-    match screen {
-        Screen::PortSelect => map_port_select(key),
-        Screen::BaudSelect => map_baud_select(key),
-        Screen::Connected => map_connected(key),
+            // If a menu is open, Esc closes it; otherwise forward to screen handler
+            if app.open_menu.is_some() {
+                return match key.code {
+                    KeyCode::Esc => Some(Message::CloseMenu),
+                    _ => Some(Message::CloseMenu),
+                };
+            }
+
+            match app.screen {
+                Screen::PortSelect => map_port_select(key),
+                Screen::BaudSelect => map_baud_select(key),
+                Screen::Connected => map_connected(key),
+            }
+        }
+        Event::Mouse(mouse) => match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => {
+                Some(Message::MenuClick(mouse.column, mouse.row))
+            }
+            MouseEventKind::ScrollUp => {
+                if app.screen == Screen::Connected {
+                    Some(Message::ScrollUp)
+                } else {
+                    None
+                }
+            }
+            MouseEventKind::ScrollDown => {
+                if app.screen == Screen::Connected {
+                    Some(Message::ScrollDown)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -69,6 +101,8 @@ fn map_connected(key: KeyEvent) -> Option<Message> {
         KeyCode::BackTab => Some(Message::PrevTab),
         KeyCode::Tab => Some(Message::NextTab),
         KeyCode::Char(c @ '1'..='9') => Some(Message::SwitchTab(c as usize - '1' as usize)),
+        KeyCode::Up => Some(Message::ScrollUp),
+        KeyCode::Down => Some(Message::ScrollDown),
         KeyCode::PageUp => Some(Message::ScrollUp),
         KeyCode::PageDown => Some(Message::ScrollDown),
         KeyCode::Enter => Some(Message::SendInput),

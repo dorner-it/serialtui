@@ -9,8 +9,9 @@ A terminal-based serial port monitor with support for multiple simultaneous conn
 - **Bidirectional communication** — read from and write to serial ports
 - **Multiple connections** — open several ports at once, switch between them
 - **Tab and grid views** — view one connection at a time or all at once in a split layout
-- **Unlimited scrollback** per connection with PageUp/PageDown scrolling
+- **Unlimited scrollback** per connection with arrow keys, PageUp/PageDown, and mouse wheel scrolling
 - **Export to file** — save any connection's scrollback as a `.txt` file with `Ctrl+E`
+- **Clickable menu bar** — File, Connection, and View menus with mouse support
 - **Cross-platform** — runs on Windows, macOS, and Linux (Windows `.exe` provided in releases)
 
 ## Installation
@@ -66,7 +67,9 @@ Open additional connections with `Ctrl+N`, which returns you to port selection.
 | Ctrl+W | Close active connection |
 | Ctrl+E | Export scrollback to .txt |
 | Ctrl+G | Toggle tab / grid view |
+| Up / Down | Scroll line by line |
 | PageUp / PageDown | Scroll |
+| Mouse wheel | Scroll |
 | Enter | Send input |
 | Ctrl+Q | Quit |
 

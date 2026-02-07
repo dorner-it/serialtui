@@ -1,4 +1,4 @@
-use ratatui::layout::{Constraint, Layout};
+use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState, Paragraph};
@@ -6,9 +6,9 @@ use ratatui::Frame;
 
 use crate::app::App;
 
-pub fn render(app: &App, frame: &mut Frame) {
+pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     let [main_area, status_area] =
-        Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
+        Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(area);
 
     if app.available_ports.is_empty() {
         let msg = Paragraph::new("No serial ports found. Press 'r' to refresh.").block(

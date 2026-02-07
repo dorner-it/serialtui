@@ -18,7 +18,7 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         crate::app::Screen::PortSelect => "↑↓ Navigate  Enter Select  r Refresh  q Quit",
         crate::app::Screen::BaudSelect => "↑↓ Navigate  Enter Connect  Esc Back",
         crate::app::Screen::Connected => {
-            "Tab Switch  Ctrl+N New  Ctrl+W Close  Ctrl+E Export  Ctrl+G Grid  PgUp/Dn Scroll  Ctrl+Q Quit"
+            "Tab Switch  Ctrl+N New  Ctrl+W Close  Ctrl+E Export  Ctrl+G Grid  ↑↓/PgUp/Dn/Wheel Scroll  Ctrl+Q Quit"
         }
     };
 
