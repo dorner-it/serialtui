@@ -29,7 +29,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         .block(Block::default().title(" Send ").borders(Borders::ALL));
     frame.render_widget(input, input_area);
 
-    super::status_bar::render(&app.screen, frame, status_area);
+    super::status_bar::render(app, frame, status_area);
 }
 
 fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {

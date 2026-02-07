@@ -1,4 +1,5 @@
 use std::sync::mpsc;
+use std::time::Instant;
 
 use crate::message::Message;
 use crate::serial::{Connection, SerialEvent};
@@ -53,6 +54,9 @@ pub struct App {
 
     // Returning from new-connection flow
     pub adding_connection: bool,
+
+    // Status message (shown briefly in status bar)
+    pub status_message: Option<(String, Instant)>,
 }
 
 impl App {
@@ -73,6 +77,7 @@ impl App {
             serial_rx,
             next_connection_id: 0,
             adding_connection: false,
+            status_message: None,
         };
         app.refresh_ports();
         app
@@ -264,6 +269,12 @@ impl App {
                 }
             }
 
+            Message::ExportScrollback => {
+                if !self.connections.is_empty() {
+                    self.export_active_scrollback();
+                }
+            }
+
             Message::ScrollUp => {
                 if !self.connections.is_empty() {
                     let conn = &mut self.connections[self.active_connection];
@@ -297,6 +308,39 @@ impl App {
         self.active_connection = self.connections.len() - 1;
         self.adding_connection = false;
         self.screen = Screen::Connected;
+    }
+
+    fn export_active_scrollback(&mut self) {
+        let conn = &self.connections[self.active_connection];
+        let safe_name = conn.port_name.replace(['/', '\\', ':'], "_");
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let filename = format!("{}_{}_{}.txt", safe_name, conn.baud_rate, timestamp);
+
+        let content: String = conn
+            .scrollback_with_partial()
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        match std::fs::write(&filename, &content) {
+            Ok(()) => {
+                self.status_message = Some((format!("Exported to {}", filename), Instant::now()));
+            }
+            Err(e) => {
+                self.status_message = Some((format!("Export failed: {}", e), Instant::now()));
+            }
+        }
+    }
+
+    pub fn status_text(&self) -> Option<&str> {
+        if let Some((msg, time)) = &self.status_message {
+            if time.elapsed().as_secs() < 3 {
+                return Some(msg);
+            }
+        }
+        None
     }
 
     fn connection_by_id(&mut self, id: usize) -> Option<&mut Connection> {

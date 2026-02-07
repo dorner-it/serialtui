@@ -59,6 +59,7 @@ fn map_connected(key: KeyEvent) -> Option<Message> {
             KeyCode::Char('n') => Some(Message::NewConnection),
             KeyCode::Char('w') => Some(Message::CloseConnection),
             KeyCode::Char('g') => Some(Message::ToggleViewMode),
+            KeyCode::Char('e') => Some(Message::ExportScrollback),
             _ => None,
         };
     }

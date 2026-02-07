@@ -3,8 +3,6 @@ use std::thread::{self, JoinHandle};
 
 use super::worker::{self, SerialEvent};
 
-const MAX_SCROLLBACK: usize = 10_000;
-
 pub struct Connection {
     pub id: usize,
     pub port_name: String,
@@ -53,9 +51,6 @@ impl Connection {
         for ch in text.chars() {
             if ch == '\n' {
                 self.scrollback.push(std::mem::take(&mut self.line_buffer));
-                if self.scrollback.len() > MAX_SCROLLBACK {
-                    self.scrollback.remove(0);
-                }
             } else if ch != '\r' {
                 self.line_buffer.push(ch);
             }

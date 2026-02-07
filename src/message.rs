@@ -24,6 +24,9 @@ pub enum Message {
     Backspace,
     SendInput,
 
+    // Export
+    ExportScrollback,
+
     // Scroll
     ScrollUp,
     ScrollDown,

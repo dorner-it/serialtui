@@ -35,5 +35,5 @@ pub fn render(app: &App, frame: &mut Frame) {
     let mut state = ListState::default().with_selected(Some(app.selected_baud_index));
     frame.render_stateful_widget(list, main_area, &mut state);
 
-    super::status_bar::render(&app.screen, frame, status_area);
+    super::status_bar::render(app, frame, status_area);
 }
