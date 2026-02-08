@@ -1,7 +1,9 @@
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
+use ratatui::widgets::{
+    Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap,
+};
 use ratatui::Frame;
 
 use crate::app::{App, PendingScreen, ViewMode};
@@ -158,17 +160,30 @@ fn render_scrollback(conn: &Connection, frame: &mut Frame, area: Rect, is_active
     let lines: Vec<&str> = conn.scrollback_with_partial().collect();
     let total = lines.len();
 
-    let start = if total > visible_height + conn.scroll_offset {
-        total - visible_height - conn.scroll_offset
+    // Clamp offset so the top of scrollback always fills the visible area
+    let max_offset = total.saturating_sub(visible_height);
+    let offset = conn.scroll_offset.min(max_offset);
+
+    let start = if total > visible_height + offset {
+        total - visible_height - offset
     } else {
         0
     };
-    let end = total.saturating_sub(conn.scroll_offset);
+    let end = total.saturating_sub(offset);
 
     let visible_lines: Vec<Line> = lines[start..end].iter().map(|s| Line::raw(*s)).collect();
 
     let content = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
     frame.render_widget(content, inner);
+
+    // Scrollbar
+    if total > visible_height {
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+        let mut scrollbar_state = ScrollbarState::new(total)
+            .position(start)
+            .viewport_content_length(visible_height);
+        frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
+    }
 }
 
 fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool) {

@@ -432,8 +432,7 @@ impl App {
                 if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     let conn = &mut self.connections[self.active_connection];
                     let total = conn.scrollback.len();
-                    let max_offset = total.saturating_sub(1);
-                    conn.scroll_offset = (conn.scroll_offset + 5).min(max_offset);
+                    conn.scroll_offset = (conn.scroll_offset + 5).min(total);
                 }
             }
 
@@ -621,34 +620,66 @@ impl App {
     }
 
     fn handle_content_click(&mut self, col: u16, row: u16) {
-        if self.screen != Screen::Connected {
-            return;
-        }
-        if self.connections.is_empty() && self.pending_connection.is_none() {
-            return;
-        }
-
-        // Layout: row 0 = menu bar, row 1+ = content area
-        // Content splits into: main_area, input_area(3 rows), status_bar(1 row)
-        // main_area goes from row 1 to (terminal_rows - 4)
-        let content_top = 1_u16;
-        let status_and_input = 4_u16; // 3 input + 1 status
-        let main_bottom = self.terminal_rows.saturating_sub(status_and_input);
-
-        match self.view_mode {
-            ViewMode::Tabs => {
-                // Tab bar is at content_top (row 1)
-                if row == content_top {
-                    self.handle_tab_bar_click(col);
-                } else if self.is_pending_active() && row > content_top && row < main_bottom {
-                    // Pending cell occupies content_top+1..main_bottom (with border)
-                    self.handle_pending_click(row, content_top + 1, main_bottom);
+        match self.screen {
+            Screen::PortSelect => {
+                // Layout: row 0 = menu bar, row 1 = top border, rows 2+ = items,
+                // bottom = bottom border + status bar
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2); // status(1) + border(1)
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = self.available_ports.len();
+                    let offset =
+                        list_scroll_offset(self.selected_port_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_port_index = item_index;
+                        self.screen = Screen::BaudSelect;
+                    }
                 }
             }
-            ViewMode::Grid => {
-                // Grid fills main_area (content_top to main_bottom)
-                if row >= content_top && row < main_bottom {
-                    self.handle_grid_click(col, row, content_top, main_bottom);
+            Screen::BaudSelect => {
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2);
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = BAUD_RATES.len();
+                    let offset =
+                        list_scroll_offset(self.selected_baud_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_baud_index = item_index;
+                        self.connect_selected();
+                    }
+                }
+            }
+            Screen::Connected => {
+                if self.connections.is_empty() && self.pending_connection.is_none() {
+                    return;
+                }
+
+                // Layout: row 0 = menu bar, row 1+ = content area
+                // Content splits into: main_area, input_area(3 rows), status_bar(1 row)
+                let content_top = 1_u16;
+                let status_and_input = 4_u16;
+                let main_bottom = self.terminal_rows.saturating_sub(status_and_input);
+
+                match self.view_mode {
+                    ViewMode::Tabs => {
+                        if row == content_top {
+                            self.handle_tab_bar_click(col);
+                        } else if self.is_pending_active() && row > content_top && row < main_bottom
+                        {
+                            self.handle_pending_click(row, content_top + 1, main_bottom);
+                        }
+                    }
+                    ViewMode::Grid => {
+                        if row >= content_top && row < main_bottom {
+                            self.handle_grid_click(col, row, content_top, main_bottom);
+                        }
+                    }
                 }
             }
         }
