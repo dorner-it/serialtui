@@ -1,6 +1,6 @@
 use ratatui::layout::{Constraint, Flex, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph};
 use ratatui::Frame;
 
@@ -109,18 +109,33 @@ fn render_filename_prompt(frame: &mut Frame, filename: &str, cursor_pos: usize) 
         .style(Style::default().fg(Color::White));
     frame.render_widget(label, label_area);
 
-    let input = Paragraph::new(Line::raw(format!("> {}", filename))).style(
-        Style::default()
-            .fg(Color::Black)
-            .bg(Color::White)
-            .add_modifier(Modifier::BOLD),
-    );
-    frame.render_widget(input, input_area);
+    // Build input line with visual cursor (inverted char at cursor position)
+    let base_style = Style::default()
+        .fg(Color::Black)
+        .bg(Color::White)
+        .add_modifier(Modifier::BOLD);
+    let cursor_style = Style::default()
+        .fg(Color::White)
+        .bg(Color::Black)
+        .add_modifier(Modifier::BOLD);
 
-    // Position cursor after "> " prefix (2 chars) + cursor_pos
-    let cursor_x = input_area.x + 2 + cursor_pos as u16;
-    let cursor_y = input_area.y;
-    frame.set_cursor_position((cursor_x, cursor_y));
+    let before = &filename[..cursor_pos];
+    let (cursor_char, after) = if cursor_pos < filename.len() {
+        (
+            &filename[cursor_pos..cursor_pos + 1],
+            &filename[cursor_pos + 1..],
+        )
+    } else {
+        (" ", "")
+    };
+
+    let input = Paragraph::new(Line::from(vec![
+        Span::styled("> ", base_style),
+        Span::styled(before.to_string(), base_style),
+        Span::styled(cursor_char.to_string(), cursor_style),
+        Span::styled(after.to_string(), base_style),
+    ]));
+    frame.render_widget(input, input_area);
 
     let hints = Paragraph::new(Line::raw("Enter Confirm  ←→ Move  Esc Cancel"))
         .style(Style::default().fg(Color::DarkGray));
