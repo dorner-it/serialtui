@@ -176,12 +176,12 @@ fn render_scrollback(conn: &Connection, frame: &mut Frame, area: Rect, is_active
     let content = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
     frame.render_widget(content, inner);
 
-    // Scrollbar
+    // Scrollbar — use scrollable range so the thumb reaches the bottom
     if total > visible_height {
+        let scroll_range = total - visible_height;
+        let scroll_pos = scroll_range.saturating_sub(offset);
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-        let mut scrollbar_state = ScrollbarState::new(total)
-            .position(start)
-            .viewport_content_length(visible_height);
+        let mut scrollbar_state = ScrollbarState::new(scroll_range).position(scroll_pos);
         frame.render_stateful_widget(scrollbar, area, &mut scrollbar_state);
     }
 }
