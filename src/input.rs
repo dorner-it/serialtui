@@ -82,6 +82,8 @@ fn map_dialog(key: KeyEvent, dialog: &Dialog) -> Option<Message> {
             KeyCode::Enter => Some(Message::DialogConfirm),
             KeyCode::Esc => Some(Message::DialogCancel),
             KeyCode::Backspace => Some(Message::DialogBackspace),
+            KeyCode::Left => Some(Message::DialogCursorLeft),
+            KeyCode::Right => Some(Message::DialogCursorRight),
             KeyCode::Char(c) => Some(Message::DialogCharInput(c)),
             _ => None,
         },

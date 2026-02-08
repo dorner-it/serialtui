@@ -42,4 +42,6 @@ pub enum Message {
     DialogConfirm,
     DialogCharInput(char),
     DialogBackspace,
+    DialogCursorLeft,
+    DialogCursorRight,
 }

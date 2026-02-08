@@ -24,8 +24,12 @@ pub fn render(dialog: &Dialog, frame: &mut Frame) {
                 "[Y]es  [N]o  [Esc] Cancel",
             );
         }
-        Dialog::FileNamePrompt { filename, .. } => {
-            render_filename_prompt(frame, filename);
+        Dialog::FileNamePrompt {
+            filename,
+            cursor_pos,
+            ..
+        } => {
+            render_filename_prompt(frame, filename, *cursor_pos);
         }
     }
 }
@@ -80,7 +84,7 @@ fn render_confirm(frame: &mut Frame, title: &str, message: &str, hint: &str) {
     frame.render_widget(hints, hint_area);
 }
 
-fn render_filename_prompt(frame: &mut Frame, filename: &str) {
+fn render_filename_prompt(frame: &mut Frame, filename: &str, cursor_pos: usize) {
     let width = (filename.len() as u16 + 6).max(40);
     let area = center_rect(width, 6, frame.area());
 
@@ -113,7 +117,12 @@ fn render_filename_prompt(frame: &mut Frame, filename: &str) {
     );
     frame.render_widget(input, input_area);
 
-    let hints = Paragraph::new(Line::raw("Enter Confirm  Esc Cancel"))
+    // Position cursor after "> " prefix (2 chars) + cursor_pos
+    let cursor_x = input_area.x + 2 + cursor_pos as u16;
+    let cursor_y = input_area.y;
+    frame.set_cursor_position((cursor_x, cursor_y));
+
+    let hints = Paragraph::new(Line::raw("Enter Confirm  ←→ Move  Esc Cancel"))
         .style(Style::default().fg(Color::DarkGray));
     frame.render_widget(hints, hint_area);
 }

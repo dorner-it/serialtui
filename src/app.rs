@@ -41,6 +41,7 @@ pub enum Dialog {
     FileNamePrompt {
         connection_idx: usize,
         filename: String,
+        cursor_pos: usize,
         after: AfterSave,
     },
 }
@@ -417,9 +418,11 @@ impl App {
             Message::ExportScrollback => {
                 if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     let filename = self.generate_filename(self.active_connection);
+                    let cursor_pos = filename.len();
                     self.dialog = Some(Dialog::FileNamePrompt {
                         connection_idx: self.active_connection,
                         filename,
+                        cursor_pos,
                         after: AfterSave::Nothing,
                     });
                 }
@@ -466,14 +469,49 @@ impl App {
             }
 
             Message::DialogCharInput(c) => {
-                if let Some(Dialog::FileNamePrompt { filename, .. }) = &mut self.dialog {
-                    filename.push(c);
+                if let Some(Dialog::FileNamePrompt {
+                    filename,
+                    cursor_pos,
+                    ..
+                }) = &mut self.dialog
+                {
+                    filename.insert(*cursor_pos, c);
+                    *cursor_pos += 1;
                 }
             }
 
             Message::DialogBackspace => {
-                if let Some(Dialog::FileNamePrompt { filename, .. }) = &mut self.dialog {
-                    filename.pop();
+                if let Some(Dialog::FileNamePrompt {
+                    filename,
+                    cursor_pos,
+                    ..
+                }) = &mut self.dialog
+                {
+                    if *cursor_pos > 0 {
+                        filename.remove(*cursor_pos - 1);
+                        *cursor_pos -= 1;
+                    }
+                }
+            }
+
+            Message::DialogCursorLeft => {
+                if let Some(Dialog::FileNamePrompt { cursor_pos, .. }) = &mut self.dialog {
+                    if *cursor_pos > 0 {
+                        *cursor_pos -= 1;
+                    }
+                }
+            }
+
+            Message::DialogCursorRight => {
+                if let Some(Dialog::FileNamePrompt {
+                    filename,
+                    cursor_pos,
+                    ..
+                }) = &mut self.dialog
+                {
+                    if *cursor_pos < filename.len() {
+                        *cursor_pos += 1;
+                    }
                 }
             }
         }
@@ -519,9 +557,11 @@ impl App {
                     self.open_menu = None;
                     if !self.connections.is_empty() {
                         let filename = self.generate_filename(self.active_connection);
+                        let cursor_pos = filename.len();
                         self.dialog = Some(Dialog::FileNamePrompt {
                             connection_idx: self.active_connection,
                             filename,
+                            cursor_pos,
                             after: AfterSave::Nothing,
                         });
                     }
@@ -581,7 +621,10 @@ impl App {
     }
 
     fn handle_content_click(&mut self, col: u16, row: u16) {
-        if self.screen != Screen::Connected || self.connections.is_empty() {
+        if self.screen != Screen::Connected {
+            return;
+        }
+        if self.connections.is_empty() && self.pending_connection.is_none() {
             return;
         }
 
@@ -597,6 +640,9 @@ impl App {
                 // Tab bar is at content_top (row 1)
                 if row == content_top {
                     self.handle_tab_bar_click(col);
+                } else if self.is_pending_active() && row > content_top && row < main_bottom {
+                    // Pending cell occupies content_top+1..main_bottom (with border)
+                    self.handle_pending_click(row, content_top + 1, main_bottom);
                 }
             }
             ViewMode::Grid => {
@@ -667,6 +713,43 @@ impl App {
             self.active_connection = idx;
         } else if idx == self.connections.len() && self.pending_connection.is_some() {
             self.active_connection = self.connections.len();
+            let cell_top = grid_top + (r as u16) * (cell_h as u16);
+            let cell_bottom = cell_top + cell_h as u16;
+            self.handle_pending_click(row, cell_top, cell_bottom);
+        }
+    }
+
+    fn handle_pending_click(&mut self, row: u16, cell_top: u16, cell_bottom: u16) {
+        // Cell has Block with Borders::ALL — inner content is 1 row inside each edge
+        let inner_top = cell_top + 1;
+        let inner_bottom = cell_bottom.saturating_sub(1);
+        if row < inner_top || row >= inner_bottom {
+            return;
+        }
+
+        let visible_height = (inner_bottom - inner_top) as usize;
+        let visual_row = (row - inner_top) as usize;
+
+        match self.pending_connection {
+            Some(PendingScreen::PortSelect) => {
+                let count = self.available_ports.len();
+                let offset = list_scroll_offset(self.selected_port_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_port_index = item_index;
+                    self.pending_connection = Some(PendingScreen::BaudSelect);
+                }
+            }
+            Some(PendingScreen::BaudSelect) => {
+                let count = BAUD_RATES.len();
+                let offset = list_scroll_offset(self.selected_baud_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_baud_index = item_index;
+                    self.connect_selected();
+                }
+            }
+            None => {}
         }
     }
 
@@ -675,9 +758,11 @@ impl App {
             Some(Dialog::ConfirmCloseConnection) => {
                 let idx = self.active_connection;
                 let filename = self.generate_filename(idx);
+                let cursor_pos = filename.len();
                 self.dialog = Some(Dialog::FileNamePrompt {
                     connection_idx: idx,
                     filename,
+                    cursor_pos,
                     after: AfterSave::CloseConnection,
                 });
             }
@@ -706,6 +791,7 @@ impl App {
             connection_idx,
             filename,
             after,
+            ..
         }) = self.dialog.take()
         {
             self.export_connection(connection_idx, &filename);
@@ -725,9 +811,11 @@ impl App {
         if let Some(idx) = indices.first().copied() {
             indices.remove(0);
             let filename = self.generate_filename(idx);
+            let cursor_pos = filename.len();
             self.dialog = Some(Dialog::FileNamePrompt {
                 connection_idx: idx,
                 filename,
+                cursor_pos,
                 after: AfterSave::QuitNext { remaining: indices },
             });
         } else {
@@ -805,5 +893,17 @@ impl App {
 
     fn connection_by_id(&mut self, id: usize) -> Option<&mut Connection> {
         self.connections.iter_mut().find(|c| c.id == id)
+    }
+}
+
+/// Compute the scroll offset ratatui's List widget uses when `ListState` starts at offset 0.
+fn list_scroll_offset(selected: usize, visible_height: usize, _count: usize) -> usize {
+    if visible_height == 0 {
+        return 0;
+    }
+    if selected >= visible_height {
+        selected - visible_height + 1
+    } else {
+        0
     }
 }
