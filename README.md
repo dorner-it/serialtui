@@ -8,11 +8,13 @@ A terminal-based serial port monitor with support for multiple simultaneous conn
 - **Configurable baud rate** — 300 to 921600, defaults to 9600
 - **Bidirectional communication** — read from and write to serial ports
 - **Multiple connections** — open several ports at once, switch between them
+- **Inline new-connection flow** — add connections in a "New" tab or grid cell without leaving the connected view
 - **Tab and grid views** — view one connection at a time or all at once in a split layout
+- **Scrollbar** — vertical scrollbar on each scrollback area
 - **Unlimited scrollback** per connection with arrow keys, PageUp/PageDown, and mouse wheel scrolling
-- **Export to file** — save scrollback as `.txt` with editable filename prompt (`Ctrl+E` or File menu)
+- **Export to file** — save scrollback as `.txt` with editable filename prompt and movable cursor (`Ctrl+E` or File menu)
 - **Save on close/quit** — prompted to export sessions when closing a connection or quitting
-- **Clickable UI** — menu bar (File, Connection, View), clickable tabs, clickable grid cells, and mouse support
+- **Clickable UI** — menu bar (File, Connection, View), clickable tabs, clickable grid cells, clickable port/baud lists, and mouse support
 - **Connection banner** — each session starts with a `--- Connected to <port> at <baud> baud ---` line
 - **Cross-platform** — runs on Windows, macOS, and Linux (Windows `.exe` provided in releases)
 
@@ -36,11 +38,11 @@ serialtui
 
 ### Workflow
 
-1. **Select a port** from the detected list
-2. **Choose a baud rate** (arrow keys + Enter)
+1. **Select a port** from the detected list (keyboard or mouse click)
+2. **Choose a baud rate** (keyboard or mouse click)
 3. **Interact** — received data appears in the scrollback, type and press Enter to send
 
-Open additional connections with `Ctrl+N` or click the green `[+]` tab — a "New" tab appears inline where you can select port and baud rate without leaving the connected view.
+Open additional connections with `Ctrl+N` or click the green `[+]` tab — a "New" tab appears inline where you can select port and baud rate without leaving the connected view. In grid view, the new connection appears as an additional grid cell.
 
 ### Exporting
 
@@ -50,7 +52,7 @@ When exporting (via `Ctrl+E`, the File menu, or when closing/quitting), a filena
 <port>_<baud>_YYYYMMDD_HHMMSS.txt
 ```
 
-Press Enter to accept, edit the name, or Esc to cancel.
+Edit the filename with full cursor support (left/right arrow keys), press Enter to accept, or Esc to cancel.
 
 When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked whether to save the session first. Choosing "Yes" walks through a filename prompt for each connection.
 
@@ -61,6 +63,7 @@ When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked wheth
 |-----|--------|
 | Up/Down | Navigate |
 | Enter | Select port |
+| Mouse click | Select port |
 | r | Refresh port list |
 | Esc / q | Quit |
 
@@ -69,6 +72,7 @@ When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked wheth
 |-----|--------|
 | Up/Down | Navigate |
 | Enter | Connect |
+| Mouse click | Connect |
 | Esc | Back |
 
 #### Connected View
@@ -86,6 +90,13 @@ When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked wheth
 | Mouse click | Switch tab or grid cell |
 | Enter | Send input |
 | Ctrl+Q | Quit (prompts to save all) |
+
+#### Export Filename Dialog
+| Key | Action |
+|-----|--------|
+| Left / Right | Move cursor |
+| Enter | Confirm |
+| Esc | Cancel |
 
 ## Building
 
