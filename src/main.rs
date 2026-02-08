@@ -40,7 +40,12 @@ fn run(
     let mut app = App::new();
 
     loop {
-        terminal.draw(|frame| ui::render(&app, frame))?;
+        terminal.draw(|frame| {
+            let size = frame.area();
+            app.terminal_cols = size.width;
+            app.terminal_rows = size.height;
+            ui::render(&app, frame);
+        })?;
 
         // Poll crossterm input events
         if let Some(msg) = input::poll_event(&app) {

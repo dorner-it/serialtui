@@ -4,7 +4,7 @@ use ratatui::crossterm::event::{
     self, Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEventKind,
 };
 
-use crate::app::{App, Dialog, Screen};
+use crate::app::{App, Dialog, PendingScreen, Screen};
 use crate::message::Message;
 
 pub fn poll_event(app: &App) -> Option<Message> {
@@ -32,7 +32,13 @@ pub fn poll_event(app: &App) -> Option<Message> {
             match app.screen {
                 Screen::PortSelect => map_port_select(key),
                 Screen::BaudSelect => map_baud_select(key),
-                Screen::Connected => map_connected(key),
+                Screen::Connected => {
+                    if app.is_pending_active() {
+                        map_pending(key, app.pending_connection.unwrap())
+                    } else {
+                        map_connected(key)
+                    }
+                }
             }
         }
         Event::Mouse(mouse) => {
@@ -100,6 +106,34 @@ fn map_baud_select(key: KeyEvent) -> Option<Message> {
         KeyCode::Up => Some(Message::Up),
         KeyCode::Down => Some(Message::Down),
         KeyCode::Enter => Some(Message::Select),
+        _ => None,
+    }
+}
+
+fn map_pending(key: KeyEvent, pending: PendingScreen) -> Option<Message> {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+    let shift = key.modifiers.contains(KeyModifiers::SHIFT);
+
+    if ctrl {
+        return match key.code {
+            KeyCode::Char('q') => Some(Message::Quit),
+            KeyCode::Char('g') => Some(Message::ToggleViewMode),
+            _ => None,
+        };
+    }
+
+    match key.code {
+        KeyCode::Tab if shift => Some(Message::PrevTab),
+        KeyCode::BackTab => Some(Message::PrevTab),
+        KeyCode::Tab => Some(Message::NextTab),
+        KeyCode::Char(c @ '1'..='9') => Some(Message::SwitchTab(c as usize - '1' as usize)),
+        KeyCode::Up => Some(Message::Up),
+        KeyCode::Down => Some(Message::Down),
+        KeyCode::Enter => Some(Message::Select),
+        KeyCode::Esc => Some(Message::Back),
+        KeyCode::Char('r') if matches!(pending, PendingScreen::PortSelect) => {
+            Some(Message::RefreshPorts)
+        }
         _ => None,
     }
 }

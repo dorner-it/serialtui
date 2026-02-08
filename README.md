@@ -12,7 +12,7 @@ A terminal-based serial port monitor with support for multiple simultaneous conn
 - **Unlimited scrollback** per connection with arrow keys, PageUp/PageDown, and mouse wheel scrolling
 - **Export to file** — save scrollback as `.txt` with editable filename prompt (`Ctrl+E` or File menu)
 - **Save on close/quit** — prompted to export sessions when closing a connection or quitting
-- **Clickable menu bar** — File (Export, Quit), Connection (New, Close), View (Tab, Grid) with mouse support
+- **Clickable UI** — menu bar (File, Connection, View), clickable tabs, clickable grid cells, and mouse support
 - **Connection banner** — each session starts with a `--- Connected to <port> at <baud> baud ---` line
 - **Cross-platform** — runs on Windows, macOS, and Linux (Windows `.exe` provided in releases)
 
@@ -40,7 +40,7 @@ serialtui
 2. **Choose a baud rate** (arrow keys + Enter)
 3. **Interact** — received data appears in the scrollback, type and press Enter to send
 
-Open additional connections with `Ctrl+N`, which returns you to port selection.
+Open additional connections with `Ctrl+N` or click the green `[+]` tab — a "New" tab appears inline where you can select port and baud rate without leaving the connected view.
 
 ### Exporting
 
@@ -56,14 +56,13 @@ When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked wheth
 
 ### Key Bindings
 
-#### Port Selection
+#### Port Selection (initial)
 | Key | Action |
 |-----|--------|
 | Up/Down | Navigate |
 | Enter | Select port |
 | r | Refresh port list |
-| Esc | Back (if adding connection) |
-| q | Quit |
+| Esc / q | Quit |
 
 #### Baud Rate Selection
 | Key | Action |
@@ -77,13 +76,14 @@ When closing a connection (`Ctrl+W`) or quitting (`Ctrl+Q`), you are asked wheth
 |-----|--------|
 | Tab / Shift+Tab | Next / previous connection |
 | 1–9 | Jump to connection N |
-| Ctrl+N | New connection |
+| Ctrl+N | New connection (inline tab) |
 | Ctrl+W | Close active connection (prompts to save) |
 | Ctrl+E | Export scrollback to .txt |
 | Ctrl+G | Toggle tab / grid view |
 | Up / Down | Scroll line by line |
 | PageUp / PageDown | Scroll |
 | Mouse wheel | Scroll |
+| Mouse click | Switch tab or grid cell |
 | Enter | Send input |
 | Ctrl+Q | Quit (prompts to save all) |
 

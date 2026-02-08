@@ -51,3 +51,36 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     super::status_bar::render(app, frame, status_area);
 }
+
+/// Render just the port list (no status bar, no outer block) for inline use in tabs/grid.
+pub fn render_content(app: &App, frame: &mut Frame, area: Rect) {
+    if app.available_ports.is_empty() {
+        let msg = Paragraph::new("No serial ports found. Press 'r' to refresh.");
+        frame.render_widget(msg, area);
+    } else {
+        let items: Vec<ListItem> = app
+            .available_ports
+            .iter()
+            .map(|p| {
+                let text = if p.description.is_empty() {
+                    p.name.clone()
+                } else {
+                    format!("{} — {}", p.name, p.description)
+                };
+                ListItem::new(Line::raw(text))
+            })
+            .collect();
+
+        let list = List::new(items)
+            .highlight_style(
+                Style::default()
+                    .fg(Color::Black)
+                    .bg(Color::Cyan)
+                    .add_modifier(Modifier::BOLD),
+            )
+            .highlight_symbol("▶ ");
+
+        let mut state = ListState::default().with_selected(Some(app.selected_port_index));
+        frame.render_stateful_widget(list, area, &mut state);
+    }
+}

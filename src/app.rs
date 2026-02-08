@@ -28,6 +28,12 @@ pub enum OpenMenu {
     View,
 }
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum PendingScreen {
+    PortSelect,
+    BaudSelect,
+}
+
 #[derive(Clone)]
 pub enum Dialog {
     ConfirmCloseConnection,
@@ -85,8 +91,8 @@ pub struct App {
     // ID counter
     next_connection_id: usize,
 
-    // Returning from new-connection flow
-    pub adding_connection: bool,
+    // Inline new-connection flow (shown as a tab/grid cell)
+    pub pending_connection: Option<PendingScreen>,
 
     // Status message (shown briefly in status bar)
     pub status_message: Option<(String, Instant)>,
@@ -96,6 +102,10 @@ pub struct App {
 
     // Dialog
     pub dialog: Option<Dialog>,
+
+    // Terminal size (updated each frame for click calculations)
+    pub terminal_cols: u16,
+    pub terminal_rows: u16,
 }
 
 impl App {
@@ -115,10 +125,12 @@ impl App {
             serial_tx,
             serial_rx,
             next_connection_id: 0,
-            adding_connection: false,
+            pending_connection: None,
             status_message: None,
             open_menu: None,
             dialog: None,
+            terminal_cols: 80,
+            terminal_rows: 24,
         };
         app.refresh_ports();
         app
@@ -174,7 +186,87 @@ impl App {
         }
     }
 
+    pub fn is_pending_active(&self) -> bool {
+        self.pending_connection.is_some() && self.active_connection == self.connections.len()
+    }
+
+    fn handle_pending_message(&mut self, msg: &Message) -> bool {
+        let pending = match self.pending_connection {
+            Some(p) => p,
+            None => return false,
+        };
+        match msg {
+            Message::Up => {
+                match pending {
+                    PendingScreen::PortSelect => {
+                        if self.selected_port_index > 0 {
+                            self.selected_port_index -= 1;
+                        }
+                    }
+                    PendingScreen::BaudSelect => {
+                        if self.selected_baud_index > 0 {
+                            self.selected_baud_index -= 1;
+                        }
+                    }
+                }
+                true
+            }
+            Message::Down => {
+                match pending {
+                    PendingScreen::PortSelect => {
+                        if !self.available_ports.is_empty()
+                            && self.selected_port_index < self.available_ports.len() - 1
+                        {
+                            self.selected_port_index += 1;
+                        }
+                    }
+                    PendingScreen::BaudSelect => {
+                        if self.selected_baud_index < BAUD_RATES.len() - 1 {
+                            self.selected_baud_index += 1;
+                        }
+                    }
+                }
+                true
+            }
+            Message::Select => {
+                match pending {
+                    PendingScreen::PortSelect => {
+                        if !self.available_ports.is_empty() {
+                            self.pending_connection = Some(PendingScreen::BaudSelect);
+                        }
+                    }
+                    PendingScreen::BaudSelect => {
+                        self.connect_selected();
+                    }
+                }
+                true
+            }
+            Message::Back => {
+                match pending {
+                    PendingScreen::PortSelect => {
+                        self.pending_connection = None;
+                        if !self.connections.is_empty() {
+                            self.active_connection = self.connections.len() - 1;
+                        }
+                    }
+                    PendingScreen::BaudSelect => {
+                        self.pending_connection = Some(PendingScreen::PortSelect);
+                    }
+                }
+                true
+            }
+            Message::RefreshPorts => {
+                self.refresh_ports();
+                true
+            }
+            _ => false,
+        }
+    }
+
     pub fn update(&mut self, msg: Message) {
+        if self.is_pending_active() && self.handle_pending_message(&msg) {
+            return;
+        }
         match msg {
             Message::Quit => {
                 if self.connections.is_empty() {
@@ -228,18 +320,12 @@ impl App {
 
             Message::Back => match self.screen {
                 Screen::PortSelect => {
-                    if self.adding_connection {
-                        self.adding_connection = false;
-                        self.screen = Screen::Connected;
+                    if self.connections.is_empty() {
+                        self.should_quit = true;
                     }
                 }
                 Screen::BaudSelect => {
-                    if self.adding_connection {
-                        self.adding_connection = false;
-                        self.screen = Screen::Connected;
-                    } else {
-                        self.screen = Screen::PortSelect;
-                    }
+                    self.screen = Screen::PortSelect;
                 }
                 _ => {}
             },
@@ -249,29 +335,41 @@ impl App {
             }
 
             Message::NewConnection => {
-                if self.screen == Screen::Connected {
-                    self.adding_connection = true;
+                if self.screen == Screen::Connected && self.pending_connection.is_none() {
+                    self.pending_connection = Some(PendingScreen::PortSelect);
                     self.refresh_ports();
-                    self.screen = Screen::PortSelect;
+                    self.active_connection = self.connections.len();
                 }
             }
 
             Message::CloseConnection => {
-                if !self.connections.is_empty() {
+                if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     self.dialog = Some(Dialog::ConfirmCloseConnection);
                 }
             }
 
             Message::NextTab => {
-                if !self.connections.is_empty() {
-                    self.active_connection = (self.active_connection + 1) % self.connections.len();
+                let total = self.connections.len()
+                    + if self.pending_connection.is_some() {
+                        1
+                    } else {
+                        0
+                    };
+                if total > 0 {
+                    self.active_connection = (self.active_connection + 1) % total;
                 }
             }
 
             Message::PrevTab => {
-                if !self.connections.is_empty() {
+                let total = self.connections.len()
+                    + if self.pending_connection.is_some() {
+                        1
+                    } else {
+                        0
+                    };
+                if total > 0 {
                     self.active_connection = if self.active_connection == 0 {
-                        self.connections.len() - 1
+                        total - 1
                     } else {
                         self.active_connection - 1
                     };
@@ -279,7 +377,13 @@ impl App {
             }
 
             Message::SwitchTab(n) => {
-                if n < self.connections.len() {
+                let total = self.connections.len()
+                    + if self.pending_connection.is_some() {
+                        1
+                    } else {
+                        0
+                    };
+                if n < total {
                     self.active_connection = n;
                 }
             }
@@ -300,7 +404,10 @@ impl App {
             }
 
             Message::SendInput => {
-                if !self.input_buffer.is_empty() && !self.connections.is_empty() {
+                if !self.input_buffer.is_empty()
+                    && !self.connections.is_empty()
+                    && self.active_connection < self.connections.len()
+                {
                     let data = format!("{}\r\n", self.input_buffer);
                     self.connections[self.active_connection].send(data.as_bytes());
                     self.input_buffer.clear();
@@ -308,7 +415,7 @@ impl App {
             }
 
             Message::ExportScrollback => {
-                if !self.connections.is_empty() {
+                if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     let filename = self.generate_filename(self.active_connection);
                     self.dialog = Some(Dialog::FileNamePrompt {
                         connection_idx: self.active_connection,
@@ -319,7 +426,7 @@ impl App {
             }
 
             Message::ScrollUp => {
-                if !self.connections.is_empty() {
+                if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     let conn = &mut self.connections[self.active_connection];
                     let total = conn.scrollback.len();
                     let max_offset = total.saturating_sub(1);
@@ -328,7 +435,7 @@ impl App {
             }
 
             Message::ScrollDown => {
-                if !self.connections.is_empty() {
+                if !self.connections.is_empty() && self.active_connection < self.connections.len() {
                     let conn = &mut self.connections[self.active_connection];
                     conn.scroll_offset = conn.scroll_offset.saturating_sub(5);
                 }
@@ -398,6 +505,8 @@ impl App {
 
         // Clicking on an open dropdown
         let Some(menu) = self.open_menu else {
+            // No menu open — check for content area clicks
+            self.handle_content_click(col, row);
             return;
         };
 
@@ -434,10 +543,10 @@ impl App {
                 let drop_col = col.wrapping_sub(MENU_CONN_X);
                 if row == 2 && drop_w.contains(&drop_col) {
                     self.open_menu = None;
-                    if self.screen == Screen::Connected {
-                        self.adding_connection = true;
+                    if self.screen == Screen::Connected && self.pending_connection.is_none() {
+                        self.pending_connection = Some(PendingScreen::PortSelect);
                         self.refresh_ports();
-                        self.screen = Screen::PortSelect;
+                        self.active_connection = self.connections.len();
                     }
                     true
                 } else if row == 3 && drop_w.contains(&drop_col) {
@@ -468,6 +577,96 @@ impl App {
         };
         if !handled {
             self.open_menu = None;
+        }
+    }
+
+    fn handle_content_click(&mut self, col: u16, row: u16) {
+        if self.screen != Screen::Connected || self.connections.is_empty() {
+            return;
+        }
+
+        // Layout: row 0 = menu bar, row 1+ = content area
+        // Content splits into: main_area, input_area(3 rows), status_bar(1 row)
+        // main_area goes from row 1 to (terminal_rows - 4)
+        let content_top = 1_u16;
+        let status_and_input = 4_u16; // 3 input + 1 status
+        let main_bottom = self.terminal_rows.saturating_sub(status_and_input);
+
+        match self.view_mode {
+            ViewMode::Tabs => {
+                // Tab bar is at content_top (row 1)
+                if row == content_top {
+                    self.handle_tab_bar_click(col);
+                }
+            }
+            ViewMode::Grid => {
+                // Grid fills main_area (content_top to main_bottom)
+                if row >= content_top && row < main_bottom {
+                    self.handle_grid_click(col, row, content_top, main_bottom);
+                }
+            }
+        }
+    }
+
+    fn handle_tab_bar_click(&mut self, col: u16) {
+        let mut x = 0_u16;
+        for (i, conn) in self.connections.iter().enumerate() {
+            let label_width = conn.label().len() as u16 + 2; // " label "
+            if col >= x && col < x + label_width {
+                self.active_connection = i;
+                return;
+            }
+            x += label_width;
+        }
+        // Check "New" tab if pending
+        if self.pending_connection.is_some() {
+            let new_label_width = 5_u16; // " New "
+            if col >= x && col < x + new_label_width {
+                self.active_connection = self.connections.len();
+                return;
+            }
+            x += new_label_width;
+        }
+        // Check [+] button (only shown when no pending)
+        if self.pending_connection.is_none() && col >= x && col < x + 5 {
+            self.pending_connection = Some(PendingScreen::PortSelect);
+            self.refresh_ports();
+            self.active_connection = self.connections.len();
+        }
+    }
+
+    fn handle_grid_click(&mut self, col: u16, row: u16, grid_top: u16, grid_bottom: u16) {
+        let total = self.connections.len()
+            + if self.pending_connection.is_some() {
+                1
+            } else {
+                0
+            };
+        if total == 0 {
+            return;
+        }
+
+        let grid_height = grid_bottom - grid_top;
+        let grid_width = self.terminal_cols;
+
+        let grid_cols = (total as f64).sqrt().ceil() as usize;
+        let grid_rows = total.div_ceil(grid_cols);
+
+        let cell_h = grid_height as usize / grid_rows;
+        let cell_w = grid_width as usize / grid_cols;
+
+        if cell_h == 0 || cell_w == 0 {
+            return;
+        }
+
+        let r = (row - grid_top) as usize / cell_h;
+        let c = col as usize / cell_w;
+        let idx = r * grid_cols + c;
+
+        if idx < self.connections.len() {
+            self.active_connection = idx;
+        } else if idx == self.connections.len() && self.pending_connection.is_some() {
+            self.active_connection = self.connections.len();
         }
     }
 
@@ -545,7 +744,7 @@ impl App {
         self.connections.remove(idx);
         if self.connections.is_empty() {
             self.screen = Screen::PortSelect;
-            self.adding_connection = false;
+            self.pending_connection = None;
             self.refresh_ports();
         } else if self.active_connection >= self.connections.len() {
             self.active_connection = self.connections.len() - 1;
@@ -564,7 +763,7 @@ impl App {
         let conn = Connection::new(id, port_name, baud_rate, self.serial_tx.clone());
         self.connections.push(conn);
         self.active_connection = self.connections.len() - 1;
-        self.adding_connection = false;
+        self.pending_connection = None;
         self.screen = Screen::Connected;
     }
 

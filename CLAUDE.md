@@ -27,12 +27,12 @@ One `std::thread` per connection. Each thread opens a serial port with 10ms read
 
 ### Module Layout
 
-- `src/app.rs` — `App` state, `Screen`/`ViewMode` enums, `update()` dispatch
+- `src/app.rs` — `App` state, enums (`Screen`, `ViewMode`, `OpenMenu`, `PendingScreen`, `Dialog`, `AfterSave`), `update()` dispatch, menu/click/dialog handlers
 - `src/message.rs` — `Message` enum for all user input events
-- `src/input.rs` — crossterm event → `Message` mapping, keybindings per screen
+- `src/input.rs` — crossterm event → `Message` mapping, keybindings per screen (including `map_pending` for inline new-connection flow)
 - `src/serial/connection.rs` — `Connection` struct (scrollback, channels, thread handle)
 - `src/serial/worker.rs` — `connection_thread()` serial read/write loop, `SerialEvent` enum
-- `src/ui/` — all rendering: `port_select`, `baud_select`, `terminal_view`, `status_bar`
+- `src/ui/` — all rendering: `port_select`, `baud_select`, `terminal_view`, `status_bar`, `menu_bar`, `dialog`
 
 ## CI/CD
 

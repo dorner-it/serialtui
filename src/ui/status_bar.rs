@@ -15,10 +15,22 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
     }
 
     let help = match app.screen {
-        crate::app::Screen::PortSelect => "↑↓ Navigate  Enter Select  r Refresh  q Quit",
+        crate::app::Screen::PortSelect => "↑↓ Navigate  Enter Select  r Refresh  Esc/q Quit",
         crate::app::Screen::BaudSelect => "↑↓ Navigate  Enter Connect  Esc Back",
         crate::app::Screen::Connected => {
-            "Tab Switch  Ctrl+N New  Ctrl+W Close  Ctrl+E Export  Ctrl+G Grid  ↑↓/PgUp/Dn/Wheel Scroll  Ctrl+Q Quit"
+            if app.is_pending_active() {
+                match app.pending_connection {
+                    Some(crate::app::PendingScreen::PortSelect) => {
+                        "↑↓ Navigate  Enter Select  r Refresh  Tab Switch  Esc Cancel"
+                    }
+                    Some(crate::app::PendingScreen::BaudSelect) => {
+                        "↑↓ Navigate  Enter Connect  Tab Switch  Esc Back"
+                    }
+                    None => "",
+                }
+            } else {
+                "Tab Switch  Ctrl+N New  Ctrl+W Close  Ctrl+E Export  Ctrl+G Grid  ↑↓/PgUp/Dn/Wheel Scroll  Ctrl+Q Quit"
+            }
         }
     };
 

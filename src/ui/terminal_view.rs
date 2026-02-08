@@ -4,11 +4,11 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph, Wrap};
 use ratatui::Frame;
 
-use crate::app::{App, ViewMode};
+use crate::app::{App, PendingScreen, ViewMode};
 use crate::serial::Connection;
 
 pub fn render(app: &App, frame: &mut Frame, area: Rect) {
-    if app.connections.is_empty() {
+    if app.connections.is_empty() && app.pending_connection.is_none() {
         return;
     }
 
@@ -37,7 +37,7 @@ fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {
         Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(area);
 
     // Tab bar
-    let tabs: Vec<Span> = app
+    let mut all_spans: Vec<Span> = app
         .connections
         .iter()
         .enumerate()
@@ -58,28 +58,50 @@ fn render_tabs(app: &App, frame: &mut Frame, area: Rect) {
         })
         .collect();
 
-    let mut all_spans = tabs;
-    all_spans.push(Span::styled(" [+] ", Style::default().fg(Color::Green)));
+    // "New" tab when a pending connection exists
+    if app.pending_connection.is_some() {
+        let pending_idx = app.connections.len();
+        let style = if app.active_connection == pending_idx {
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Yellow)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(Color::Yellow)
+        };
+        all_spans.push(Span::styled(" New ", style));
+    } else {
+        all_spans.push(Span::styled(" [+] ", Style::default().fg(Color::Green)));
+    }
 
     frame.render_widget(Paragraph::new(Line::from(all_spans)), tab_bar);
 
-    // Scrollback content
-    render_scrollback(
-        &app.connections[app.active_connection],
-        frame,
-        content_area,
-        true,
-    );
+    // Content area
+    if app.is_pending_active() {
+        render_pending_cell(app, frame, content_area, true);
+    } else if app.active_connection < app.connections.len() {
+        render_scrollback(
+            &app.connections[app.active_connection],
+            frame,
+            content_area,
+            true,
+        );
+    }
 }
 
 fn render_grid(app: &App, frame: &mut Frame, area: Rect) {
-    let count = app.connections.len();
-    if count == 0 {
+    let total = app.connections.len()
+        + if app.pending_connection.is_some() {
+            1
+        } else {
+            0
+        };
+    if total == 0 {
         return;
     }
 
-    let cols = (count as f64).sqrt().ceil() as usize;
-    let rows = count.div_ceil(cols);
+    let cols = (total as f64).sqrt().ceil() as usize;
+    let rows = total.div_ceil(cols);
 
     let row_constraints: Vec<Constraint> = (0..rows)
         .map(|_| Constraint::Ratio(1, rows as u32))
@@ -94,11 +116,16 @@ fn render_grid(app: &App, frame: &mut Frame, area: Rect) {
         let col_areas = Layout::horizontal(col_constraints.clone()).split(row_areas[row]);
         for col in 0..cols {
             let idx = row * cols + col;
-            if idx >= count {
+            if idx >= total {
                 break;
             }
-            let is_active = idx == app.active_connection;
-            render_scrollback(&app.connections[idx], frame, col_areas[col], is_active);
+            if idx < app.connections.len() {
+                let is_active = idx == app.active_connection;
+                render_scrollback(&app.connections[idx], frame, col_areas[col], is_active);
+            } else {
+                let is_active = app.active_connection == app.connections.len();
+                render_pending_cell(app, frame, col_areas[col], is_active);
+            }
         }
     }
 }
@@ -142,4 +169,39 @@ fn render_scrollback(conn: &Connection, frame: &mut Frame, area: Rect, is_active
 
     let content = Paragraph::new(visible_lines).wrap(Wrap { trim: false });
     frame.render_widget(content, inner);
+}
+
+fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool) {
+    let pending = match app.pending_connection {
+        Some(p) => p,
+        None => return,
+    };
+
+    let border_color = if is_active {
+        Color::Yellow
+    } else {
+        Color::DarkGray
+    };
+
+    let title = match pending {
+        PendingScreen::PortSelect => " Select Port ",
+        PendingScreen::BaudSelect => " Select Baud ",
+    };
+
+    let block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(border_color));
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    match pending {
+        PendingScreen::PortSelect => {
+            super::port_select::render_content(app, frame, inner);
+        }
+        PendingScreen::BaudSelect => {
+            super::baud_select::render_content(app, frame, inner);
+        }
+    }
 }

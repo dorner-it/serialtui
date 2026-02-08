@@ -37,3 +37,23 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     super::status_bar::render(app, frame, status_area);
 }
+
+/// Render just the baud list (no status bar, no outer block) for inline use in tabs/grid.
+pub fn render_content(app: &App, frame: &mut Frame, area: Rect) {
+    let items: Vec<ListItem> = BAUD_RATES
+        .iter()
+        .map(|b| ListItem::new(Line::raw(b.to_string())))
+        .collect();
+
+    let list = List::new(items)
+        .highlight_style(
+            Style::default()
+                .fg(Color::Black)
+                .bg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        )
+        .highlight_symbol("▶ ");
+
+    let mut state = ListState::default().with_selected(Some(app.selected_baud_index));
+    frame.render_stateful_widget(list, area, &mut state);
+}
