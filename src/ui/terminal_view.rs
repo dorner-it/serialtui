@@ -204,6 +204,7 @@ fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool
         PendingScreen::DataBitsSelect => " Select Data Bits ",
         PendingScreen::ParitySelect => " Select Parity ",
         PendingScreen::StopBitsSelect => " Select Stop Bits ",
+        PendingScreen::DisplayModeSelect => " Select Display Mode ",
     };
 
     let block = Block::default()
@@ -229,6 +230,9 @@ fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool
         }
         PendingScreen::StopBitsSelect => {
             super::stop_bits_select::render_content(app, frame, inner);
+        }
+        PendingScreen::DisplayModeSelect => {
+            super::display_mode_select::render_content(app, frame, inner);
         }
     }
 }

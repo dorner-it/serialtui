@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::time::Instant;
 
 use crate::message::Message;
-use crate::serial::{Connection, SerialEvent};
+use crate::serial::{Connection, DisplayMode, SerialEvent};
 
 pub const BAUD_RATES: &[u32] = &[
     300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600,
@@ -26,6 +26,11 @@ pub const STOP_BITS_OPTIONS: &[(&str, serialport::StopBits)] = &[
     ("2", serialport::StopBits::Two),
 ];
 
+pub const DISPLAY_MODE_OPTIONS: &[(&str, DisplayMode)] = &[
+    ("Text (UTF-8)", DisplayMode::Text),
+    ("Hex Dump", DisplayMode::HexDump),
+];
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
     PortSelect,
@@ -33,6 +38,7 @@ pub enum Screen {
     DataBitsSelect,
     ParitySelect,
     StopBitsSelect,
+    DisplayModeSelect,
     Connected,
 }
 
@@ -56,6 +62,7 @@ pub enum PendingScreen {
     DataBitsSelect,
     ParitySelect,
     StopBitsSelect,
+    DisplayModeSelect,
 }
 
 #[derive(Clone)]
@@ -110,6 +117,9 @@ pub struct App {
     // Stop bits selection
     pub selected_stop_bits_index: usize,
 
+    // Display mode selection
+    pub selected_display_mode_index: usize,
+
     // Connections
     pub connections: Vec<Connection>,
     pub active_connection: usize,
@@ -155,6 +165,7 @@ impl App {
             selected_data_bits_index: 3, // Eight
             selected_parity_index: 0,    // None
             selected_stop_bits_index: 0, // One
+            selected_display_mode_index: 0, // Text
             connections: Vec::new(),
             active_connection: 0,
             view_mode: ViewMode::Tabs,
@@ -260,6 +271,11 @@ impl App {
                             self.selected_stop_bits_index -= 1;
                         }
                     }
+                    PendingScreen::DisplayModeSelect => {
+                        if self.selected_display_mode_index > 0 {
+                            self.selected_display_mode_index -= 1;
+                        }
+                    }
                 }
                 true
             }
@@ -292,6 +308,11 @@ impl App {
                             self.selected_stop_bits_index += 1;
                         }
                     }
+                    PendingScreen::DisplayModeSelect => {
+                        if self.selected_display_mode_index < DISPLAY_MODE_OPTIONS.len() - 1 {
+                            self.selected_display_mode_index += 1;
+                        }
+                    }
                 }
                 true
             }
@@ -312,6 +333,9 @@ impl App {
                         self.pending_connection = Some(PendingScreen::StopBitsSelect);
                     }
                     PendingScreen::StopBitsSelect => {
+                        self.pending_connection = Some(PendingScreen::DisplayModeSelect);
+                    }
+                    PendingScreen::DisplayModeSelect => {
                         self.connect_selected();
                     }
                 }
@@ -336,6 +360,9 @@ impl App {
                     }
                     PendingScreen::StopBitsSelect => {
                         self.pending_connection = Some(PendingScreen::ParitySelect);
+                    }
+                    PendingScreen::DisplayModeSelect => {
+                        self.pending_connection = Some(PendingScreen::StopBitsSelect);
                     }
                 }
                 true
@@ -387,6 +414,11 @@ impl App {
                         self.selected_stop_bits_index -= 1;
                     }
                 }
+                Screen::DisplayModeSelect => {
+                    if self.selected_display_mode_index > 0 {
+                        self.selected_display_mode_index -= 1;
+                    }
+                }
                 _ => {}
             },
 
@@ -418,6 +450,11 @@ impl App {
                         self.selected_stop_bits_index += 1;
                     }
                 }
+                Screen::DisplayModeSelect => {
+                    if self.selected_display_mode_index < DISPLAY_MODE_OPTIONS.len() - 1 {
+                        self.selected_display_mode_index += 1;
+                    }
+                }
                 _ => {}
             },
 
@@ -437,6 +474,9 @@ impl App {
                     self.screen = Screen::StopBitsSelect;
                 }
                 Screen::StopBitsSelect => {
+                    self.screen = Screen::DisplayModeSelect;
+                }
+                Screen::DisplayModeSelect => {
                     self.connect_selected();
                 }
                 _ => {}
@@ -459,6 +499,9 @@ impl App {
                 }
                 Screen::StopBitsSelect => {
                     self.screen = Screen::ParitySelect;
+                }
+                Screen::DisplayModeSelect => {
+                    self.screen = Screen::StopBitsSelect;
                 }
                 _ => {}
             },
@@ -831,6 +874,22 @@ impl App {
                     let item_index = offset + visual_row;
                     if item_index < count {
                         self.selected_stop_bits_index = item_index;
+                        self.screen = Screen::DisplayModeSelect;
+                    }
+                }
+            }
+            Screen::DisplayModeSelect => {
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2);
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = DISPLAY_MODE_OPTIONS.len();
+                    let offset =
+                        list_scroll_offset(self.selected_display_mode_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_display_mode_index = item_index;
                         self.connect_selected();
                     }
                 }
@@ -987,6 +1046,16 @@ impl App {
                 let item_index = offset + visual_row;
                 if item_index < count {
                     self.selected_stop_bits_index = item_index;
+                    self.pending_connection = Some(PendingScreen::DisplayModeSelect);
+                }
+            }
+            Some(PendingScreen::DisplayModeSelect) => {
+                let count = DISPLAY_MODE_OPTIONS.len();
+                let offset =
+                    list_scroll_offset(self.selected_display_mode_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_display_mode_index = item_index;
                     self.connect_selected();
                 }
             }
@@ -1089,6 +1158,7 @@ impl App {
         let data_bits = DATA_BITS_OPTIONS[self.selected_data_bits_index].1;
         let parity = PARITY_OPTIONS[self.selected_parity_index].1;
         let stop_bits = STOP_BITS_OPTIONS[self.selected_stop_bits_index].1;
+        let display_mode = DISPLAY_MODE_OPTIONS[self.selected_display_mode_index].1;
         let id = self.next_connection_id;
         self.next_connection_id += 1;
 
@@ -1099,6 +1169,7 @@ impl App {
             data_bits,
             parity,
             stop_bits,
+            display_mode,
             self.serial_tx.clone(),
         );
         self.connections.push(conn);

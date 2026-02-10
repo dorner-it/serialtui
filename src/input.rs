@@ -35,6 +35,7 @@ pub fn poll_event(app: &App) -> Option<Message> {
                 Screen::DataBitsSelect => map_list_select(key),
                 Screen::ParitySelect => map_list_select(key),
                 Screen::StopBitsSelect => map_list_select(key),
+                Screen::DisplayModeSelect => map_list_select(key),
                 Screen::Connected => {
                     if app.is_pending_active() {
                         map_pending(key, app.pending_connection.unwrap())

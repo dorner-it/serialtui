@@ -19,7 +19,8 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
         crate::app::Screen::BaudSelect => "↑↓ Navigate  Enter Select  Esc Back",
         crate::app::Screen::DataBitsSelect => "↑↓ Navigate  Enter Select  Esc Back",
         crate::app::Screen::ParitySelect => "↑↓ Navigate  Enter Select  Esc Back",
-        crate::app::Screen::StopBitsSelect => "↑↓ Navigate  Enter Connect  Esc Back",
+        crate::app::Screen::StopBitsSelect => "↑↓ Navigate  Enter Select  Esc Back",
+        crate::app::Screen::DisplayModeSelect => "↑↓ Navigate  Enter Connect  Esc Back",
         crate::app::Screen::Connected => {
             if app.is_pending_active() {
                 match app.pending_connection {
@@ -36,6 +37,9 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
                         "↑↓ Navigate  Enter Select  Tab Switch  Esc Back"
                     }
                     Some(crate::app::PendingScreen::StopBitsSelect) => {
+                        "↑↓ Navigate  Enter Select  Tab Switch  Esc Back"
+                    }
+                    Some(crate::app::PendingScreen::DisplayModeSelect) => {
                         "↑↓ Navigate  Enter Connect  Tab Switch  Esc Back"
                     }
                     None => "",

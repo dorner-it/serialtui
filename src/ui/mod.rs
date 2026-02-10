@@ -1,6 +1,7 @@
 mod baud_select;
 mod data_bits_select;
 mod dialog;
+mod display_mode_select;
 mod menu_bar;
 mod parity_select;
 mod port_select;
@@ -23,6 +24,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         Screen::DataBitsSelect => data_bits_select::render(app, frame, content_area),
         Screen::ParitySelect => parity_select::render(app, frame, content_area),
         Screen::StopBitsSelect => stop_bits_select::render(app, frame, content_area),
+        Screen::DisplayModeSelect => display_mode_select::render(app, frame, content_area),
         Screen::Connected => terminal_view::render(app, frame, content_area),
     }
 
