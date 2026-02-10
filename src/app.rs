@@ -8,10 +8,23 @@ pub const BAUD_RATES: &[u32] = &[
     300, 1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600,
 ];
 
+pub const PARITY_OPTIONS: &[(&str, serialport::Parity)] = &[
+    ("None", serialport::Parity::None),
+    ("Odd", serialport::Parity::Odd),
+    ("Even", serialport::Parity::Even),
+];
+
+pub const STOP_BITS_OPTIONS: &[(&str, serialport::StopBits)] = &[
+    ("1", serialport::StopBits::One),
+    ("2", serialport::StopBits::Two),
+];
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Screen {
     PortSelect,
     BaudSelect,
+    ParitySelect,
+    StopBitsSelect,
     Connected,
 }
 
@@ -32,6 +45,8 @@ pub enum OpenMenu {
 pub enum PendingScreen {
     PortSelect,
     BaudSelect,
+    ParitySelect,
+    StopBitsSelect,
 }
 
 #[derive(Clone)]
@@ -77,6 +92,12 @@ pub struct App {
     // Baud selection
     pub selected_baud_index: usize,
 
+    // Parity selection
+    pub selected_parity_index: usize,
+
+    // Stop bits selection
+    pub selected_stop_bits_index: usize,
+
     // Connections
     pub connections: Vec<Connection>,
     pub active_connection: usize,
@@ -119,6 +140,8 @@ impl App {
             available_ports: Vec::new(),
             selected_port_index: 0,
             selected_baud_index: 4, // 9600 default
+            selected_parity_index: 0,    // None
+            selected_stop_bits_index: 0, // One
             connections: Vec::new(),
             active_connection: 0,
             view_mode: ViewMode::Tabs,
@@ -209,6 +232,16 @@ impl App {
                             self.selected_baud_index -= 1;
                         }
                     }
+                    PendingScreen::ParitySelect => {
+                        if self.selected_parity_index > 0 {
+                            self.selected_parity_index -= 1;
+                        }
+                    }
+                    PendingScreen::StopBitsSelect => {
+                        if self.selected_stop_bits_index > 0 {
+                            self.selected_stop_bits_index -= 1;
+                        }
+                    }
                 }
                 true
             }
@@ -226,6 +259,16 @@ impl App {
                             self.selected_baud_index += 1;
                         }
                     }
+                    PendingScreen::ParitySelect => {
+                        if self.selected_parity_index < PARITY_OPTIONS.len() - 1 {
+                            self.selected_parity_index += 1;
+                        }
+                    }
+                    PendingScreen::StopBitsSelect => {
+                        if self.selected_stop_bits_index < STOP_BITS_OPTIONS.len() - 1 {
+                            self.selected_stop_bits_index += 1;
+                        }
+                    }
                 }
                 true
             }
@@ -237,6 +280,12 @@ impl App {
                         }
                     }
                     PendingScreen::BaudSelect => {
+                        self.pending_connection = Some(PendingScreen::ParitySelect);
+                    }
+                    PendingScreen::ParitySelect => {
+                        self.pending_connection = Some(PendingScreen::StopBitsSelect);
+                    }
+                    PendingScreen::StopBitsSelect => {
                         self.connect_selected();
                     }
                 }
@@ -252,6 +301,12 @@ impl App {
                     }
                     PendingScreen::BaudSelect => {
                         self.pending_connection = Some(PendingScreen::PortSelect);
+                    }
+                    PendingScreen::ParitySelect => {
+                        self.pending_connection = Some(PendingScreen::BaudSelect);
+                    }
+                    PendingScreen::StopBitsSelect => {
+                        self.pending_connection = Some(PendingScreen::ParitySelect);
                     }
                 }
                 true
@@ -288,6 +343,16 @@ impl App {
                         self.selected_baud_index -= 1;
                     }
                 }
+                Screen::ParitySelect => {
+                    if self.selected_parity_index > 0 {
+                        self.selected_parity_index -= 1;
+                    }
+                }
+                Screen::StopBitsSelect => {
+                    if self.selected_stop_bits_index > 0 {
+                        self.selected_stop_bits_index -= 1;
+                    }
+                }
                 _ => {}
             },
 
@@ -304,6 +369,16 @@ impl App {
                         self.selected_baud_index += 1;
                     }
                 }
+                Screen::ParitySelect => {
+                    if self.selected_parity_index < PARITY_OPTIONS.len() - 1 {
+                        self.selected_parity_index += 1;
+                    }
+                }
+                Screen::StopBitsSelect => {
+                    if self.selected_stop_bits_index < STOP_BITS_OPTIONS.len() - 1 {
+                        self.selected_stop_bits_index += 1;
+                    }
+                }
                 _ => {}
             },
 
@@ -314,6 +389,12 @@ impl App {
                     }
                 }
                 Screen::BaudSelect => {
+                    self.screen = Screen::ParitySelect;
+                }
+                Screen::ParitySelect => {
+                    self.screen = Screen::StopBitsSelect;
+                }
+                Screen::StopBitsSelect => {
                     self.connect_selected();
                 }
                 _ => {}
@@ -327,6 +408,12 @@ impl App {
                 }
                 Screen::BaudSelect => {
                     self.screen = Screen::PortSelect;
+                }
+                Screen::ParitySelect => {
+                    self.screen = Screen::BaudSelect;
+                }
+                Screen::StopBitsSelect => {
+                    self.screen = Screen::ParitySelect;
                 }
                 _ => {}
             },
@@ -651,6 +738,38 @@ impl App {
                     let item_index = offset + visual_row;
                     if item_index < count {
                         self.selected_baud_index = item_index;
+                        self.screen = Screen::ParitySelect;
+                    }
+                }
+            }
+            Screen::ParitySelect => {
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2);
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = PARITY_OPTIONS.len();
+                    let offset =
+                        list_scroll_offset(self.selected_parity_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_parity_index = item_index;
+                        self.screen = Screen::StopBitsSelect;
+                    }
+                }
+            }
+            Screen::StopBitsSelect => {
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2);
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = STOP_BITS_OPTIONS.len();
+                    let offset =
+                        list_scroll_offset(self.selected_stop_bits_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_stop_bits_index = item_index;
                         self.connect_selected();
                     }
                 }
@@ -777,6 +896,26 @@ impl App {
                 let item_index = offset + visual_row;
                 if item_index < count {
                     self.selected_baud_index = item_index;
+                    self.pending_connection = Some(PendingScreen::ParitySelect);
+                }
+            }
+            Some(PendingScreen::ParitySelect) => {
+                let count = PARITY_OPTIONS.len();
+                let offset =
+                    list_scroll_offset(self.selected_parity_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_parity_index = item_index;
+                    self.pending_connection = Some(PendingScreen::StopBitsSelect);
+                }
+            }
+            Some(PendingScreen::StopBitsSelect) => {
+                let count = STOP_BITS_OPTIONS.len();
+                let offset =
+                    list_scroll_offset(self.selected_stop_bits_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_stop_bits_index = item_index;
                     self.connect_selected();
                 }
             }
@@ -876,10 +1015,19 @@ impl App {
         }
         let port_name = self.available_ports[self.selected_port_index].name.clone();
         let baud_rate = BAUD_RATES[self.selected_baud_index];
+        let parity = PARITY_OPTIONS[self.selected_parity_index].1;
+        let stop_bits = STOP_BITS_OPTIONS[self.selected_stop_bits_index].1;
         let id = self.next_connection_id;
         self.next_connection_id += 1;
 
-        let conn = Connection::new(id, port_name, baud_rate, self.serial_tx.clone());
+        let conn = Connection::new(
+            id,
+            port_name,
+            baud_rate,
+            parity,
+            stop_bits,
+            self.serial_tx.clone(),
+        );
         self.connections.push(conn);
         self.active_connection = self.connections.len() - 1;
         self.pending_connection = None;

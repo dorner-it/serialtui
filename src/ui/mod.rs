@@ -1,8 +1,10 @@
 mod baud_select;
 mod dialog;
 mod menu_bar;
+mod parity_select;
 mod port_select;
 mod status_bar;
+mod stop_bits_select;
 mod terminal_view;
 
 use ratatui::layout::{Constraint, Layout};
@@ -17,6 +19,8 @@ pub fn render(app: &App, frame: &mut Frame) {
     match app.screen {
         Screen::PortSelect => port_select::render(app, frame, content_area),
         Screen::BaudSelect => baud_select::render(app, frame, content_area),
+        Screen::ParitySelect => parity_select::render(app, frame, content_area),
+        Screen::StopBitsSelect => stop_bits_select::render(app, frame, content_area),
         Screen::Connected => terminal_view::render(app, frame, content_area),
     }
 

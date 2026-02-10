@@ -32,6 +32,8 @@ pub fn poll_event(app: &App) -> Option<Message> {
             match app.screen {
                 Screen::PortSelect => map_port_select(key),
                 Screen::BaudSelect => map_baud_select(key),
+                Screen::ParitySelect => map_list_select(key),
+                Screen::StopBitsSelect => map_list_select(key),
                 Screen::Connected => {
                     if app.is_pending_active() {
                         map_pending(key, app.pending_connection.unwrap())
@@ -103,6 +105,16 @@ fn map_port_select(key: KeyEvent) -> Option<Message> {
 }
 
 fn map_baud_select(key: KeyEvent) -> Option<Message> {
+    match key.code {
+        KeyCode::Esc => Some(Message::Back),
+        KeyCode::Up => Some(Message::Up),
+        KeyCode::Down => Some(Message::Down),
+        KeyCode::Enter => Some(Message::Select),
+        _ => None,
+    }
+}
+
+fn map_list_select(key: KeyEvent) -> Option<Message> {
     match key.code {
         KeyCode::Esc => Some(Message::Back),
         KeyCode::Up => Some(Message::Up),

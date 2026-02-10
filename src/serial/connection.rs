@@ -7,6 +7,8 @@ pub struct Connection {
     pub id: usize,
     pub port_name: String,
     pub baud_rate: u32,
+    pub parity: serialport::Parity,
+    pub stop_bits: serialport::StopBits,
     pub scrollback: Vec<String>,
     pub scroll_offset: usize,
     pub write_tx: Option<mpsc::Sender<Vec<u8>>>,
@@ -20,20 +22,36 @@ impl Connection {
         id: usize,
         port_name: String,
         baud_rate: u32,
+        parity: serialport::Parity,
+        stop_bits: serialport::StopBits,
         serial_tx: mpsc::Sender<SerialEvent>,
     ) -> Self {
         let (write_tx, write_rx) = mpsc::channel();
         let name = port_name.clone();
 
         let handle = thread::spawn(move || {
-            worker::connection_thread(id, &name, baud_rate, serial_tx, write_rx);
+            worker::connection_thread(id, &name, baud_rate, parity, stop_bits, serial_tx, write_rx);
         });
 
-        let start_msg = format!("--- Connected to {} at {} baud ---", port_name, baud_rate);
+        let parity_str = match parity {
+            serialport::Parity::None => "N",
+            serialport::Parity::Odd => "O",
+            serialport::Parity::Even => "E",
+        };
+        let stop_str = match stop_bits {
+            serialport::StopBits::One => "1",
+            serialport::StopBits::Two => "2",
+        };
+        let start_msg = format!(
+            "--- Connected to {} at {} baud ({}{}) ---",
+            port_name, baud_rate, parity_str, stop_str
+        );
         Self {
             id,
             port_name,
             baud_rate,
+            parity,
+            stop_bits,
             scrollback: vec![start_msg],
             scroll_offset: 0,
             write_tx: Some(write_tx),

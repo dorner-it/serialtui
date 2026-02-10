@@ -12,11 +12,15 @@ pub fn connection_thread(
     id: usize,
     port_name: &str,
     baud_rate: u32,
+    parity: serialport::Parity,
+    stop_bits: serialport::StopBits,
     serial_tx: mpsc::Sender<SerialEvent>,
     write_rx: mpsc::Receiver<Vec<u8>>,
 ) {
     let port = serialport::new(port_name, baud_rate)
         .timeout(Duration::from_millis(10))
+        .parity(parity)
+        .stop_bits(stop_bits)
         .open();
 
     let mut port = match port {

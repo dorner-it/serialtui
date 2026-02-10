@@ -16,7 +16,9 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
 
     let help = match app.screen {
         crate::app::Screen::PortSelect => "↑↓ Navigate  Enter Select  r Refresh  Esc/q Quit",
-        crate::app::Screen::BaudSelect => "↑↓ Navigate  Enter Connect  Esc Back",
+        crate::app::Screen::BaudSelect => "↑↓ Navigate  Enter Select  Esc Back",
+        crate::app::Screen::ParitySelect => "↑↓ Navigate  Enter Select  Esc Back",
+        crate::app::Screen::StopBitsSelect => "↑↓ Navigate  Enter Connect  Esc Back",
         crate::app::Screen::Connected => {
             if app.is_pending_active() {
                 match app.pending_connection {
@@ -24,6 +26,12 @@ pub fn render(app: &App, frame: &mut Frame, area: Rect) {
                         "↑↓ Navigate  Enter Select  r Refresh  Tab Switch  Esc Cancel"
                     }
                     Some(crate::app::PendingScreen::BaudSelect) => {
+                        "↑↓ Navigate  Enter Select  Tab Switch  Esc Back"
+                    }
+                    Some(crate::app::PendingScreen::ParitySelect) => {
+                        "↑↓ Navigate  Enter Select  Tab Switch  Esc Back"
+                    }
+                    Some(crate::app::PendingScreen::StopBitsSelect) => {
                         "↑↓ Navigate  Enter Connect  Tab Switch  Esc Back"
                     }
                     None => "",
