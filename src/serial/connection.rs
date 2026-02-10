@@ -7,6 +7,7 @@ pub struct Connection {
     pub id: usize,
     pub port_name: String,
     pub baud_rate: u32,
+    pub data_bits: serialport::DataBits,
     pub parity: serialport::Parity,
     pub stop_bits: serialport::StopBits,
     pub scrollback: Vec<String>,
@@ -22,6 +23,7 @@ impl Connection {
         id: usize,
         port_name: String,
         baud_rate: u32,
+        data_bits: serialport::DataBits,
         parity: serialport::Parity,
         stop_bits: serialport::StopBits,
         serial_tx: mpsc::Sender<SerialEvent>,
@@ -30,9 +32,17 @@ impl Connection {
         let name = port_name.clone();
 
         let handle = thread::spawn(move || {
-            worker::connection_thread(id, &name, baud_rate, parity, stop_bits, serial_tx, write_rx);
+            worker::connection_thread(
+                id, &name, baud_rate, data_bits, parity, stop_bits, serial_tx, write_rx,
+            );
         });
 
+        let data_bits_str = match data_bits {
+            serialport::DataBits::Five => "5",
+            serialport::DataBits::Six => "6",
+            serialport::DataBits::Seven => "7",
+            serialport::DataBits::Eight => "8",
+        };
         let parity_str = match parity {
             serialport::Parity::None => "N",
             serialport::Parity::Odd => "O",
@@ -43,13 +53,14 @@ impl Connection {
             serialport::StopBits::Two => "2",
         };
         let start_msg = format!(
-            "--- Connected to {} at {} baud ({}{}) ---",
-            port_name, baud_rate, parity_str, stop_str
+            "--- Connected to {} at {} baud ({}{}{}) ---",
+            port_name, baud_rate, data_bits_str, parity_str, stop_str
         );
         Self {
             id,
             port_name,
             baud_rate,
+            data_bits,
             parity,
             stop_bits,
             scrollback: vec![start_msg],
@@ -62,6 +73,12 @@ impl Connection {
     }
 
     pub fn label(&self) -> String {
+        let data_bits_ch = match self.data_bits {
+            serialport::DataBits::Five => '5',
+            serialport::DataBits::Six => '6',
+            serialport::DataBits::Seven => '7',
+            serialport::DataBits::Eight => '8',
+        };
         let parity_ch = match self.parity {
             serialport::Parity::None => 'N',
             serialport::Parity::Odd => 'O',
@@ -72,8 +89,8 @@ impl Connection {
             serialport::StopBits::Two => '2',
         };
         format!(
-            "{}@{}/{}{}",
-            self.port_name, self.baud_rate, parity_ch, stop_ch
+            "{}@{}/{}{}{}",
+            self.port_name, self.baud_rate, data_bits_ch, parity_ch, stop_ch
         )
     }
 

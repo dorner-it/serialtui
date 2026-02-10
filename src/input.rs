@@ -32,6 +32,7 @@ pub fn poll_event(app: &App) -> Option<Message> {
             match app.screen {
                 Screen::PortSelect => map_port_select(key),
                 Screen::BaudSelect => map_baud_select(key),
+                Screen::DataBitsSelect => map_list_select(key),
                 Screen::ParitySelect => map_list_select(key),
                 Screen::StopBitsSelect => map_list_select(key),
                 Screen::Connected => {

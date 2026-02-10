@@ -12,6 +12,7 @@ pub fn connection_thread(
     id: usize,
     port_name: &str,
     baud_rate: u32,
+    data_bits: serialport::DataBits,
     parity: serialport::Parity,
     stop_bits: serialport::StopBits,
     serial_tx: mpsc::Sender<SerialEvent>,
@@ -19,6 +20,7 @@ pub fn connection_thread(
 ) {
     let port = serialport::new(port_name, baud_rate)
         .timeout(Duration::from_millis(10))
+        .data_bits(data_bits)
         .parity(parity)
         .stop_bits(stop_bits)
         .open();

@@ -201,6 +201,7 @@ fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool
     let title = match pending {
         PendingScreen::PortSelect => " Select Port ",
         PendingScreen::BaudSelect => " Select Baud ",
+        PendingScreen::DataBitsSelect => " Select Data Bits ",
         PendingScreen::ParitySelect => " Select Parity ",
         PendingScreen::StopBitsSelect => " Select Stop Bits ",
     };
@@ -219,6 +220,9 @@ fn render_pending_cell(app: &App, frame: &mut Frame, area: Rect, is_active: bool
         }
         PendingScreen::BaudSelect => {
             super::baud_select::render_content(app, frame, inner);
+        }
+        PendingScreen::DataBitsSelect => {
+            super::data_bits_select::render_content(app, frame, inner);
         }
         PendingScreen::ParitySelect => {
             super::parity_select::render_content(app, frame, inner);

@@ -14,6 +14,13 @@ pub const PARITY_OPTIONS: &[(&str, serialport::Parity)] = &[
     ("Even", serialport::Parity::Even),
 ];
 
+pub const DATA_BITS_OPTIONS: &[(&str, serialport::DataBits)] = &[
+    ("5", serialport::DataBits::Five),
+    ("6", serialport::DataBits::Six),
+    ("7", serialport::DataBits::Seven),
+    ("8", serialport::DataBits::Eight),
+];
+
 pub const STOP_BITS_OPTIONS: &[(&str, serialport::StopBits)] = &[
     ("1", serialport::StopBits::One),
     ("2", serialport::StopBits::Two),
@@ -23,6 +30,7 @@ pub const STOP_BITS_OPTIONS: &[(&str, serialport::StopBits)] = &[
 pub enum Screen {
     PortSelect,
     BaudSelect,
+    DataBitsSelect,
     ParitySelect,
     StopBitsSelect,
     Connected,
@@ -45,6 +53,7 @@ pub enum OpenMenu {
 pub enum PendingScreen {
     PortSelect,
     BaudSelect,
+    DataBitsSelect,
     ParitySelect,
     StopBitsSelect,
 }
@@ -91,6 +100,9 @@ pub struct App {
 
     // Baud selection
     pub selected_baud_index: usize,
+
+    // Data bits selection
+    pub selected_data_bits_index: usize,
 
     // Parity selection
     pub selected_parity_index: usize,
@@ -140,6 +152,7 @@ impl App {
             available_ports: Vec::new(),
             selected_port_index: 0,
             selected_baud_index: 4, // 9600 default
+            selected_data_bits_index: 3, // Eight
             selected_parity_index: 0,    // None
             selected_stop_bits_index: 0, // One
             connections: Vec::new(),
@@ -232,6 +245,11 @@ impl App {
                             self.selected_baud_index -= 1;
                         }
                     }
+                    PendingScreen::DataBitsSelect => {
+                        if self.selected_data_bits_index > 0 {
+                            self.selected_data_bits_index -= 1;
+                        }
+                    }
                     PendingScreen::ParitySelect => {
                         if self.selected_parity_index > 0 {
                             self.selected_parity_index -= 1;
@@ -259,6 +277,11 @@ impl App {
                             self.selected_baud_index += 1;
                         }
                     }
+                    PendingScreen::DataBitsSelect => {
+                        if self.selected_data_bits_index < DATA_BITS_OPTIONS.len() - 1 {
+                            self.selected_data_bits_index += 1;
+                        }
+                    }
                     PendingScreen::ParitySelect => {
                         if self.selected_parity_index < PARITY_OPTIONS.len() - 1 {
                             self.selected_parity_index += 1;
@@ -280,6 +303,9 @@ impl App {
                         }
                     }
                     PendingScreen::BaudSelect => {
+                        self.pending_connection = Some(PendingScreen::DataBitsSelect);
+                    }
+                    PendingScreen::DataBitsSelect => {
                         self.pending_connection = Some(PendingScreen::ParitySelect);
                     }
                     PendingScreen::ParitySelect => {
@@ -302,8 +328,11 @@ impl App {
                     PendingScreen::BaudSelect => {
                         self.pending_connection = Some(PendingScreen::PortSelect);
                     }
-                    PendingScreen::ParitySelect => {
+                    PendingScreen::DataBitsSelect => {
                         self.pending_connection = Some(PendingScreen::BaudSelect);
+                    }
+                    PendingScreen::ParitySelect => {
+                        self.pending_connection = Some(PendingScreen::DataBitsSelect);
                     }
                     PendingScreen::StopBitsSelect => {
                         self.pending_connection = Some(PendingScreen::ParitySelect);
@@ -343,6 +372,11 @@ impl App {
                         self.selected_baud_index -= 1;
                     }
                 }
+                Screen::DataBitsSelect => {
+                    if self.selected_data_bits_index > 0 {
+                        self.selected_data_bits_index -= 1;
+                    }
+                }
                 Screen::ParitySelect => {
                     if self.selected_parity_index > 0 {
                         self.selected_parity_index -= 1;
@@ -369,6 +403,11 @@ impl App {
                         self.selected_baud_index += 1;
                     }
                 }
+                Screen::DataBitsSelect => {
+                    if self.selected_data_bits_index < DATA_BITS_OPTIONS.len() - 1 {
+                        self.selected_data_bits_index += 1;
+                    }
+                }
                 Screen::ParitySelect => {
                     if self.selected_parity_index < PARITY_OPTIONS.len() - 1 {
                         self.selected_parity_index += 1;
@@ -389,6 +428,9 @@ impl App {
                     }
                 }
                 Screen::BaudSelect => {
+                    self.screen = Screen::DataBitsSelect;
+                }
+                Screen::DataBitsSelect => {
                     self.screen = Screen::ParitySelect;
                 }
                 Screen::ParitySelect => {
@@ -409,8 +451,11 @@ impl App {
                 Screen::BaudSelect => {
                     self.screen = Screen::PortSelect;
                 }
-                Screen::ParitySelect => {
+                Screen::DataBitsSelect => {
                     self.screen = Screen::BaudSelect;
+                }
+                Screen::ParitySelect => {
+                    self.screen = Screen::DataBitsSelect;
                 }
                 Screen::StopBitsSelect => {
                     self.screen = Screen::ParitySelect;
@@ -738,6 +783,22 @@ impl App {
                     let item_index = offset + visual_row;
                     if item_index < count {
                         self.selected_baud_index = item_index;
+                        self.screen = Screen::DataBitsSelect;
+                    }
+                }
+            }
+            Screen::DataBitsSelect => {
+                let inner_top = 2_u16;
+                let inner_bottom = self.terminal_rows.saturating_sub(2);
+                if row >= inner_top && row < inner_bottom {
+                    let visible_height = (inner_bottom - inner_top) as usize;
+                    let visual_row = (row - inner_top) as usize;
+                    let count = DATA_BITS_OPTIONS.len();
+                    let offset =
+                        list_scroll_offset(self.selected_data_bits_index, visible_height, count);
+                    let item_index = offset + visual_row;
+                    if item_index < count {
+                        self.selected_data_bits_index = item_index;
                         self.screen = Screen::ParitySelect;
                     }
                 }
@@ -896,6 +957,16 @@ impl App {
                 let item_index = offset + visual_row;
                 if item_index < count {
                     self.selected_baud_index = item_index;
+                    self.pending_connection = Some(PendingScreen::DataBitsSelect);
+                }
+            }
+            Some(PendingScreen::DataBitsSelect) => {
+                let count = DATA_BITS_OPTIONS.len();
+                let offset =
+                    list_scroll_offset(self.selected_data_bits_index, visible_height, count);
+                let item_index = offset + visual_row;
+                if item_index < count {
+                    self.selected_data_bits_index = item_index;
                     self.pending_connection = Some(PendingScreen::ParitySelect);
                 }
             }
@@ -1015,6 +1086,7 @@ impl App {
         }
         let port_name = self.available_ports[self.selected_port_index].name.clone();
         let baud_rate = BAUD_RATES[self.selected_baud_index];
+        let data_bits = DATA_BITS_OPTIONS[self.selected_data_bits_index].1;
         let parity = PARITY_OPTIONS[self.selected_parity_index].1;
         let stop_bits = STOP_BITS_OPTIONS[self.selected_stop_bits_index].1;
         let id = self.next_connection_id;
@@ -1024,6 +1096,7 @@ impl App {
             id,
             port_name,
             baud_rate,
+            data_bits,
             parity,
             stop_bits,
             self.serial_tx.clone(),
