@@ -62,7 +62,19 @@ impl Connection {
     }
 
     pub fn label(&self) -> String {
-        format!("{}@{}", self.port_name, self.baud_rate)
+        let parity_ch = match self.parity {
+            serialport::Parity::None => 'N',
+            serialport::Parity::Odd => 'O',
+            serialport::Parity::Even => 'E',
+        };
+        let stop_ch = match self.stop_bits {
+            serialport::StopBits::One => '1',
+            serialport::StopBits::Two => '2',
+        };
+        format!(
+            "{}@{}/{}{}",
+            self.port_name, self.baud_rate, parity_ch, stop_ch
+        )
     }
 
     pub fn push_data(&mut self, data: &[u8]) {
